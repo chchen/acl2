@@ -75,7 +75,7 @@
 
   (define and-expr ((x pseudo-termp) (y pseudo-termp))
     :returns (x^y pseudo-termp)
-    (list 'if (pseudo-term-fix x) (pseudo-term-fix y) 'nil)
+    (list 'if (pseudo-term-fix x) (pseudo-term-fix y) ''nil)
     ///
     (more-returns
       (x^y :name ev-smtcp-of-and-expr
