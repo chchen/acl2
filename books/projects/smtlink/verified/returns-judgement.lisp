@@ -256,7 +256,7 @@
 
 (defthm correctness-of-returns-judgement
   (implies (and (ev-smtcp-meta-extract-global-facts)
-                (pseudo-termp term)
+                ;(pseudo-termp term)
                 (alistp a)
                 (symbolp fn)
                 (pseudo-term-listp actuals)

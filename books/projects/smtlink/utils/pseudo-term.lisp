@@ -132,6 +132,12 @@
 ;  pseudo-termp-of-cdar-when-pseudo-term-alistp
 ;  )))
 
+(defthm assoc-equal-of-pseudo-term-alistp
+  (implies (and (pseudo-term-alistp x)
+                (assoc-equal y x))
+           (and (consp (assoc-equal y x))
+                (pseudo-termp (cdr (assoc-equal y x))))))
+
 (defthm pseudo-term-alistp-of-pairlis$-of-symbol-listp-and-pseudo-term-listp
   (implies (and (symbol-listp y)
                 (pseudo-term-listp x))
@@ -145,10 +151,6 @@
 (defthm nil-of-assoc-equal-of-pseudo-term-alistp
   (implies (and (pseudo-term-alistp x) (not (consp (assoc-equal y x))))
            (not (assoc-equal y x))))
-
-(defthm assoc-equal-of-pseudo-term-alistp
-  (implies (and (pseudo-term-alistp x) (assoc-equal y x))
-           (pseudo-termp (cdr (assoc-equal y x)))))
 
 (defalist pseudo-term-integer
   :key-type pseudo-termp
@@ -176,47 +178,59 @@
 ;; -------------------------------------------
 ;; acl2-count theorems
 
-(defthm acl2-count-of-lambda-body
-  (implies (and (pseudo-termp term)
-                (consp term)
-                (pseudo-lambdap (car term)))
-           (< (acl2-count (pseudo-term-fix (caddr (car term))))
-              (acl2-count term)))
-  :hints (("Goal" :in-theory (e/d (pseudo-lambdap)
-                                  (lambda-of-pseudo-lambdap
-                                   pseudo-termp
-                                   pseudo-term-listp
-                                   acl2-count
-                                   symbol-listp
-                                   consp-of-pseudo-lambdap)))))
+(defrule acl2-count-of-pseudo-term-fix
+  (<= (acl2-count (pseudo-term-fix x))
+      (acl2-count x))
+  :rule-classes (:rewrite :linear)
+  :in-theory (enable pseudo-term-fix))
 
-(defthm acl2-count-of-if-cond
-  (implies (and (pseudo-termp term)
-                (consp term)
-                (equal (car term) 'if)
-                (equal (len (cdr term)) 3))
-           (< (acl2-count (pseudo-term-fix (cadr term)))
-              (+ 1 (acl2-count (cdr term))))))
+(defrule acl2-count-of-pseudo-term-list-fix
+  (<= (acl2-count (pseudo-term-list-fix lst))
+      (acl2-count lst))
+  :rule-classes (:rewrite :linear)
+  :in-theory (enable pseudo-term-list-fix))
 
-(defthm acl2-count-of-if-then
-  (implies (and (pseudo-termp term)
-                (consp term)
-                (equal (car term) 'if)
-                (equal (len (cdr term)) 3))
-           (< (acl2-count (pseudo-term-fix (caddr term)))
-              (+ 1 (acl2-count (cdr term))))))
-
-(defthm acl2-count-of-if-else
-  (implies (and (pseudo-termp term)
-                (consp term)
-                (equal (car term) 'if)
-                (equal (len (cdr term)) 3))
-           (< (acl2-count (pseudo-term-fix (cadddr term)))
-              (+ 1 (acl2-count (cdr term))))))
-
-(defthm acl2-count-of-pseudo-term-listp
-  (implies (and (pseudo-term-listp term-lst)
-                (consp term-lst))
-           (< (acl2-count (pseudo-term-fix (car term-lst)))
-              (acl2-count term-lst))))
+;(defthm acl2-count-of-lambda-body
+;  (implies (and (pseudo-termp term)
+;                (consp term)
+;                (pseudo-lambdap (car term)))
+;           (< (acl2-count (pseudo-term-fix (caddr (car term))))
+;              (acl2-count term)))
+;  :hints (("Goal" :in-theory (e/d (pseudo-lambdap)
+;                                  (lambda-of-pseudo-lambdap
+;                                   pseudo-termp
+;                                   pseudo-term-listp
+;                                   acl2-count
+;                                   symbol-listp
+;                                   consp-of-pseudo-lambdap)))))
+;
+;(defthm acl2-count-of-if-cond
+;  (implies (and (pseudo-termp term)
+;                (consp term)
+;                (equal (car term) 'if)
+;                (equal (len (cdr term)) 3))
+;           (< (acl2-count (pseudo-term-fix (cadr term)))
+;              (+ 1 (acl2-count (cdr term))))))
+;
+;(defthm acl2-count-of-if-then
+;  (implies (and (pseudo-termp term)
+;                (consp term)
+;                (equal (car term) 'if)
+;                (equal (len (cdr term)) 3))
+;           (< (acl2-count (pseudo-term-fix (caddr term)))
+;              (+ 1 (acl2-count (cdr term))))))
+;
+;(defthm acl2-count-of-if-else
+;  (implies (and (pseudo-termp term)
+;                (consp term)
+;                (equal (car term) 'if)
+;                (equal (len (cdr term)) 3))
+;           (< (acl2-count (pseudo-term-fix (cadddr term)))
+;              (+ 1 (acl2-count (cdr term))))))
+;
+;(defthm acl2-count-of-pseudo-term-listp
+;  (implies (and (pseudo-term-listp term-lst)
+;                (consp term-lst))
+;           (< (acl2-count (pseudo-term-fix (car term-lst)))
+;              (acl2-count term-lst))))
 

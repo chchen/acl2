@@ -992,13 +992,15 @@
     (b* (((unless (symbolp fn)) nil)
 	       (fn-lvls (sym-int-alist-fix fn-lvls))
 	       (options (expand-options-fix options))
-	       ((expand-options o) options)
+	       (basic? (is-basic-function fn))
 	       (lvl (assoc-equal fn fn-lvls))
+	       ((expand-options o) options)
 	       (functions? (assoc-equal fn o.functions)))
-      (or (and lvl (<= (cdr lvl) 0))
-	        (and (not lvl)
-	             functions?
-	             (<= (smt-function->depth (cdr functions?)) 0))))))
+      (or (not (equal basic? nil)) ; coerce basic? to a boolean
+	  (and lvl (<= (cdr lvl) 0))
+	  (and (not lvl)
+	       functions?
+	       (<= (smt-function->depth (cdr functions?)) 0))))))
 
 (defsection expand-term
   (pseudo-useless)

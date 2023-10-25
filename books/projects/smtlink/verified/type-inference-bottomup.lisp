@@ -20,6 +20,7 @@
 (include-book "typed-term-fns")
 (include-book "judgement-fns")
 (include-book "returns-judgement")
+(include-book "mrg-crazy-hint")
 (include-book "../utils/fresh-vars")
 
 (set-state-ok t)
@@ -525,7 +526,9 @@
        (next-cp (cdr (assoc-equal 'type-judge-bottomup *SMT-architecture*)))
        ((if (null next-cp)) (value (list cl)))
        (the-hint
-        `(:clause-processor (,next-cp clause ',smtlink-hint state)))
+	 (if (by-nil-hint 'type-judge-bottomup-x)
+	   '(:by nil)
+           `(:clause-processor (,next-cp clause ',smtlink-hint state))))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 

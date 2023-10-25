@@ -12,6 +12,11 @@
 
 (include-book "hint-interface")
 
+; BOZO-mrg: I'm including expand-options for the find-recognizers function.
+;   find-recognizers should be in hint-interface, but I don't want to change
+;   the hint-interface book without double-checking with Yan.
+(include-book "expand-options")
+
 (defalist type-to-types-alist
   :key-type symbolp
   :val-type smt-sub/supertype-list-p
@@ -27,6 +32,7 @@
   ((supertype type-to-types-alist-p)
    (subtype type-to-types-alist-p)
    (functions symbol-thm-spec-list-alist-p)
+   (type-recognizers fn-sym-list-p)
    (names symbol-listp)))
 
 (define construct-sub/supertype-alist ((types smt-acl2type-list-p))
@@ -63,8 +69,10 @@
        ((smtlink-hint h) smtlink-hint)
        ((mv subtype supertype) (construct-sub/supertype-alist h.acl2types))
        (functions (construct-function-alist h.functions nil))
+       (type-recognizers (find-recognizers h))
        (names (acl2::simple-term-vars term)))
     (make-type-options :supertype supertype
                        :subtype subtype
                        :functions functions
+                       :type-recognizers type-recognizers
                        :names names)))

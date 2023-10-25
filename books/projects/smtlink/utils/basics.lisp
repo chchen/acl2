@@ -8,15 +8,58 @@
 (include-book "centaur/fty/top" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
+(include-book "std/strings/cat" :dir :system)
+
+;; (symcat [sym0 ...]) is a macro for "concatenating" atoms into a symbol
+;; (symcat) returns nil
+;; Otherwise, we concatenate the strings for each atom in the list of arguments
+;;   and intern a symbol in the same package as sym0.
+;; If (symbol-name sym0) is "IGNORE", then we still use it to determine the
+;;   package in which to intern the symbol we create, but we ignore it when
+;;   constructing the symbol name.  For example,
+;;     (symcat :IGNORE a 2 b)
+;;   returns the symbol :a2b.  If you really want to create a symbol whose
+;;   name starts with "IGNORE" you can just say "IGNORE" twice, only the 
+;;   first one is ignored.  For example,
+;;     (symcat 'IGNORE 'IGNORE 42)
+;;   returns the symbol 'IGNORE42 in the current package.  
+;;
+;; BOZO: Other developers must need a function similar to this.  If I find
+;;   such a function in the community books, I'll be happy to use it.
+(defun symcat-fn (syms)
+  (if (consp syms)
+    (cons (list 'explode-atom (car syms) 10) (symcat-fn (cdr syms)))
+    nil))
+
+(defmacro symcat (&rest syms)
+  (if (consp syms)
+    (list 'if (list 'equal (list 'symbol-name (car syms)) "IGNORE")
+	    (if (consp (cdr syms))
+              `(intern-in-package-of-symbol
+		(coerce (append ,@(symcat-fn (cdr syms))) 'string)
+		,(car syms))
+	      nil)
+	    `(intern-in-package-of-symbol
+	      (coerce (append ,@(symcat-fn syms)) 'string)
+	      ,(car syms)))
+    nil))
+
+
+(defmacro keycat (&rest syms)
+  (if (consp syms)
+    `(intern
+      (coerce (append ,@(symcat-fn syms)) 'string)
+      "keyword")
+    nil))
+
 
 ;; easy-fix is a macro for defining a fty::deffixtype when we've got a
 ;;   recognizer function and a default value.
-(defun easy-fix-fn (type-name default-value)
-  (b* ((type-str (symbol-name type-name))
-       (type-pred (intern-in-package-of-symbol (concatenate 'string type-str "-P") type-name))
-       (type-fix (intern-in-package-of-symbol (concatenate 'string type-str "-FIX") type-name))
-       (type-fix-lemma (intern-in-package-of-symbol (concatenate 'string type-str "-FIX-WHEN-" type-str "-P") type-name))
-       (type-equiv (intern-in-package-of-symbol (concatenate 'string type-str "-EQUIV") type-name)))
+(define easy-fix-fn ((type-name symbolp) (default-value acl2::any-p))
+  (b* ((type-pred (symcat type-name '-p))
+       (type-fix (symcat type-name '-fix))
+       (type-fix-lemma (symcat type-name 'fix-when- type-name '-p))
+       (type-equiv (symcat type-name '-equiv)))
     `(defsection ,type-name
        (define ,type-fix ((x ,type-pred))
          :returns(fix-x ,type-pred)
@@ -37,6 +80,8 @@
 (defmacro easy-fix (type-name default-value)
   `(make-event (easy-fix-fn ',type-name ',default-value)))
 
+; true-list is same as fty::list -- probably remove this,
+; but, I'll have to figure out the various changes.
 (define true-list-fix ((lst true-listp))
   :parents (SMT-hint-interface)
   :short "Fixing function for true-listp."
@@ -70,26 +115,6 @@
   :forward t
   :topic true-listp)
 
-(define string-list-fix ((lst string-listp))
-  :parents (SMT-hint-interface)
-  :short "Fixing function for string-listp."
-  :returns (fixed-lst string-listp)
-  (mbe :logic (if (string-listp lst) lst nil)
-       :exec lst))
-
-(defthm string-list-fix-idempotent-lemma
-  (equal (string-list-fix (string-list-fix x))
-         (string-list-fix x))
-  :hints (("Goal" :in-theory (enable string-list-fix))))
-
-(deffixtype string-list
-  :fix string-list-fix
-  :pred string-listp
-  :equiv string-list-equiv
-  :define t
-  :forward t
-  :topic string-listp)
-
 (defalist symbol-symbol-alist
   :key-type symbolp
   :val-type symbolp
@@ -102,13 +127,11 @@
 
 (defthm strip-cars-of-symbol-symbol-alistp
   (implies (symbol-symbol-alistp x)
-           (symbol-listp (strip-cars x)))
-  :hints (("Goal" :in-theory (enable strip-cars))))
+           (symbol-listp (strip-cars x))))
 
 (defthm strip-cdrs-of-symbol-symbol-alistp
   (implies (symbol-symbol-alistp x)
-           (symbol-listp (strip-cdrs x)))
-  :hints (("Goal" :in-theory (enable strip-cdrs))))
+           (symbol-listp (strip-cdrs x))))
 
 (deflist symbol-list-list
   :elt-type symbol-listp
@@ -135,8 +158,9 @@
  (defthm symbol-alistp-of-pairlis$-of-symbol-listp
    (implies (symbol-listp x)
             (symbol-alistp (pairlis$ x y)))
-   :hints (("Goal" :in-theory (enable symbol-alistp pairlis$))))
+   :hints (("Goal" :in-theory (enable symbol-alistp))))
  )
+
 
 (defalist symbol-symbol-list-alist
   :key-type symbolp
