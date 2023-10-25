@@ -82,16 +82,18 @@
   :returns (conjuncts pseudo-term-listp)
   :verify-guards nil
   (b* ((term (pseudo-term-fix term))
+       (acc (pseudo-term-list-fix acc))
+       ((if (equal term ''t)) acc)
        ((unless (and (consp term) (consp (cdr term)) (consp (cddr term))
 		     (consp (cdddr term)) (not (cddddr term))
 		     (equal (car term) 'if)
-		     (equal (cadddr term) 'nil)))
-	(cons term (pseudo-term-list-fix acc)))
+		     (equal (cadddr term) ''nil)))
+	(cons term acc))
        (condx (cadr term))
        (thenx (caddr term)))
     (parse-conjunct-helper
-      thenx
-      (parse-conjunct-helper condx acc)))
+     thenx
+     (parse-conjunct-helper condx acc)))
   ///
   (verify-guards parse-conjunct-helper)
 
@@ -242,7 +244,7 @@
 	  (er hard? 'top-level
 	      (concatenate 'string
 			   "Badly formed judgements for term ~q0~%"
-			   "  judgements~q1~%")
+			   "  judgements ~q1~%")
 	      term judge-pt jx)
 	  '((smt::bad-judgement x)))))
     (std::mergesort jx))
@@ -740,7 +742,7 @@
   :returns (new-tt ttmrg-p)
   (let* ((recognizers (type-options->type-recognizers options))
 	 (j (case (ttmrg->kind tterm)
-	      (:val    (judge-set-of-ground-term tterm recognizers state))
+	      (:quote  (judge-set-of-ground-term tterm recognizers state))
 	      (:var    (judge-set-of-variable tterm options state))
 	      (:if     (judge-set-of-if tterm))
 	      (:fncall (judge-set-of-fncall tterm options state)))))
