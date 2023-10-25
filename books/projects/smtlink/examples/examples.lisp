@@ -1227,7 +1227,6 @@
 ;;                          :hints (:in-theory (enable foo))))
 ;;           ))))
 
-
 ;; (def-saved-event x^2+y^2-integer
 ;;   (define x^2+y^2-integer ((x integerp)
 ;;                            (y integerp))

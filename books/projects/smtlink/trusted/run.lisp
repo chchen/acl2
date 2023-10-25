@@ -37,7 +37,7 @@
              :args (list cmd))))
 
   ;; Changes included to bind counter example to global variable "cex" - Carl
-(define SMT-interpret ((fname stringp) (rm-file booleanp) (smt-conf smtlink-config-p) (state))
+(define SMT-interpret ((fname stringp) (rm-file booleanp) (smt-conf smtlink-config-p) (state state-p))
   (declare (xargs :stobjs state))
     :returns (mv (proved? booleanp)
                  (state))
@@ -70,14 +70,15 @@
                        (consp (cdar str))))
           (prog2$
            (er hard? 'SMT-run=>SMT-interpret "We can't prove anything about the ~
-thing returned by read-string. So we add a check for it. It's surprising that ~
-the check for (true-listp str) and (consp (car str)) failed: ~q0" str)
+  thing returned by read-string. So we add a check for it. It's surprising that ~
+  the check for (true-listp str) and (consp (car str)) failed: ~q0" str)
            (mv nil state)))
          (- (cw "Possible counter-example found: ~p0~%One can access it ~
                  through global variable SMT-cex by doing (@ SMT-cex).~%"
                 (unquote (car str))))
          (state (f-put-global 'SMT-cex nil state))
-         (state (f-put-global 'SMT-cex (car str) state)))
+         (state (f-put-global 'SMT-cex (car str) state))
+	 )
       (mv nil state)))
 
   (encapsulate ()

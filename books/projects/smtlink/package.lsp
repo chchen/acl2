@@ -34,6 +34,7 @@
       defxdoc
       defsection
       def-join-thms
+      defrule
       termify-clause-set
       body
       lambda-formals
@@ -70,7 +71,6 @@
       read-string
 
       str::cat
-      str::nat-to-dec-string
       str::strtok
       str::count
       str::substrp
@@ -79,12 +79,15 @@
       str::firstn-chars
       str::strval
       str::search
+      str::nat-to-dec-string
       str::nat-to-hex-chars
+      str::natstr
       str::hex-digit-char-listp
       str::charlisteqv
       str::character-list-fix
       str::str-fix
       str::downcase-string
+      str::string-list-fix
 
       std::defaggregate
       std::defval

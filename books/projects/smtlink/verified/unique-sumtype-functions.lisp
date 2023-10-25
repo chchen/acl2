@@ -18,7 +18,7 @@
   :returns (mv (fn-lst symbol-listp) (trans-lst string-listp))
   (b* ((des-lst (smt-function-list-fix des-lst))
        (fn-acc (symbol-list-fix fn-acc))
-       (trans-acc (string-list-fix trans-acc))
+       (trans-acc (str::string-list-fix trans-acc))
        ((unless (consp des-lst)) (mv fn-acc trans-acc))
        ((cons des-hd des-tl) des-lst)
        ((smt-function df) des-hd)

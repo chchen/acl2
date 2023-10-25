@@ -32,14 +32,6 @@
 
   (define lambda-substitution ((fn-call pseudo-lambdap)
                                (fn-actuals pseudo-term-listp))
-    :guard-hints (("Goal"
-                   :in-theory (e/d () (alistp-of-pairlis$
-                                       acl2::true-listp-when-symbol-listp))
-                   :use ((:instance acl2::true-listp-when-symbol-listp
-                                    (acl2::x (cadr fn-call)))
-                         (:instance alistp-of-pairlis$
-                                    (a (cadr fn-call))
-                                    (b fn-actuals)))))
     :returns (subst-term
               pseudo-termp
               :hints (("Goal"

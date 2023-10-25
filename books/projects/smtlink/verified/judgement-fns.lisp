@@ -17,6 +17,7 @@
 
 (include-book "path-cond")
 (include-book "evaluator")
+(include-book "make-test")
 
 (set-state-ok t)
 
@@ -950,6 +951,7 @@ state)
       (& ''t))))
 )
 
+
 #|
 (defthm test (implies (integerp x) (rationalp x)))
 (defoption maybe-integerp integerp :pred maybe-integerp)
@@ -963,6 +965,25 @@ state)
                                                                            :formals '(y)
                                                                            :thm 'test2))))
                              '(if x 't 'nil) state)
+|#
+
+
+#| mark wrote a macro for these tests, but the test fails in the current
+   (2023/05/28) version of judgement-fns.lisp.  :(
+ 
+(make-test
+  (equal (construct-one-super/subtype '(maybe-integerp x)
+			       (make-smt-sub/supertype :type 'integerp
+						       :formals '(y)
+						       :thm 'test2)
+			       `((maybe-integerp . (,(make-smt-sub/supertype :type 'integerp
+									     :formals '(y)
+									     :thm 'test2))))
+			       '(if x 't 'nil) state)
+	 '(integerp x))
+  :name construct-one-super/subtype__test
+  :prep ((defthm test2 (implies (and (maybe-integerp y) y) (integerp y))))
+  :output (:fail (:prep . :err) (:all . :warn)))
 |#
 
 (encapsulate ()
