@@ -782,27 +782,47 @@
 (in-theory (disable ttmrg-upcc-ignore-options-and-state))
 
 
+; ttmrg-clause: produce an ACL2 clause corresponding to tterm
+; This version constructs an expression with 'implies' and 'if' where the
+; if-expression is a "translated" and.  We might want to just create the
+; clause directly:
+; (list ,(not (ttmrg-p (quote ,tterm)))
+;       ,(not ,(ttmrg-correct-expr tterm))
+;       ,(ttmrg->expr tterm))
+; But I'm leaving it in the current form for now to be close to Yan's
+; representation.  The big difference between ttmrg-clause and what Yan
+; does is that I'm including tterm in the goal so the next clause processor
+; can recover it.
+(define ttmrg-clause ((tterm ttmrg-p))
+  :returns (cl pseudo-termp :hints(("Goal" :in-theory (enable pseudo-termp))))
+  `(implies
+     (if (ttmrg-p (quote ,tterm))
+       ,(ttmrg-correct-expr tterm)
+       ''nil)
+     ,(ttmrg->expr tterm)))
+
+
 (define type-judge-bottomup-cp ((cl pseudo-term-listp)
                                 (smtlink-hint t)
                                 state)
-  (b* (((unless (pseudo-term-listp cl)) (value nil))
-       ((unless (smtlink-hint-p smtlink-hint)) (value (list cl)))
+  (b* (((unless (pseudo-term-listp cl)) (value (list nil)))
+       ((unless (smtlink-hint-p smtlink-hint)) (value (list nil)))
        (goal (disjoin cl))
-       ((unless (pseudo-term-syntax-p goal)) (value (list cl)))
+       ((unless (pseudo-term-syntax-p goal)) (value (list nil)))
        ((type-options h) (construct-type-options smtlink-hint goal))
        (new-tt (ttmrg-propagate-ti-bottom-up-term
-		 (make-ttmrg-trivial goal) h state))
-       (new-cl (implies-expr (ttmrg-correct-expr new-tt)
-			     (ttmrg->expr new-tt)))
+		(make-ttmrg-trivial goal) h state))
        (next-cp (cdr (assoc-equal 'type-judge-bottomup *SMT-architecture*)))
-       ((if (null next-cp)) (value (list cl)))
+       ((if (null next-cp)) (value (list nil)))
        (the-hint
         `(:clause-processor (,next-cp clause ',smtlink-hint state)))
+       (new-cl (ttmrg-clause new-tt))
        (hinted-goal `((hint-please ',the-hint) ,new-cl))
        (- (cw "type-judge-bottomup-cp: ~q0" hinted-goal)))
     (value (list hinted-goal))))
 
-(defthm correctness-of-type-judge-bottomup-cp
+
+(defrule correctness-of-type-judge-bottomup-cp
   (implies (and (ev-smtcp-meta-extract-global-facts)
                 (pseudo-term-listp cl)
                 (alistp a)
@@ -812,4 +832,55 @@
                    (type-judge-bottomup-cp cl hints state)))
                  a))
            (ev-smtcp (disjoin cl) a))
-  :hints (("Goal" :expand (type-judge-bottomup-cp cl hints state))))
+  :do-not-induct t
+  :expand (type-judge-bottomup-cp cl hints state)
+  :in-theory (enable ttmrg-clause)
+  :rule-classes :clause-processor)
+
+
+; (ttmrg-parse-clause cl) -> (mv fail tterm)
+;   cl should be the pseudo-termp returned by (disjoin clause) where clause
+;     is a list of disjuncts, where each disjunct satisfies termp.
+;   If cl has the form of a clause constructed by (ttmrg-clause tterm),
+;     ttmrg-parse-clause returns (mv nil tterm).
+;     In this case, we ensure (see ttmrg-parse-clause-when-good-cl) that
+;       for any context, a, either (ttmrg-correct-p tterm a) holds or cl
+;       is vacously satisified, e.g. a type-hypotheses of cl is violated
+;       in context a.  We also ensure that (ttmrg->expr tterm) implies
+;       cl in any context a.
+;   Otherwise cl does not have the form of a clause constructed by
+;     (ttmrg-clause tterm), and (ttmrg-parse-clause cl) reutrns (mv fail tterm)
+;     where fail is not nil, and tterm satisfies ttmrg-p (to make guard and
+;     returns theorems happy.  The current implementation returns ''nil for
+;     fail in this case.
+;     TODO: write smt:fail((info acl2::any-p)) -> nil.  Then, we can
+;     return clauses that will fail, but the info argument will give
+;     potentially useful feedback to the user.
+
+(define ttmrg-parse-clause ((cl pseudo-termp))
+  :returns (mv (fail pseudo-termp) (tterm ttmrg-p))
+  (b* (((unless (pseudo-termp cl)) (mv ''nil (make-ttmrg)))
+       (tterm (case-match cl
+		      (('implies ('if ('ttmrg-p tterm) & &) &) tterm)
+		      (& nil)))
+       ((unless (and (ttmrg-p tterm)
+		     (equal (ttmrg-clause tterm) cl)))
+	(mv ''nil (make-ttmrg))))
+    (mv ''nil (make-ttmrg)))
+  ///
+  (defrule ttmrg-parse-clause-when-good-cl
+    (mv-let
+      (fail tterm)
+      (ttmrg-parse-clause cl)
+      (implies (not fail)
+	       (and (ttmrg-correct-p tterm a)
+		    (implies (ev-smtcp (ttmrg->expr tterm) a)
+			     (ev-smtcp cl a)))))
+    :in-theory (enable ttmrg-parse-clause ttmrg-clause))
+
+  (defrule ttmrg-parse-clause-when-bad-cl
+    (let ((fail (mv-nth 0 (ttmrg-parse-clause cl))))
+      (implies fail
+	       (implies (ev-smtcp fail a)
+			(ev-smtcp cl a))))
+    :in-theory (enable ttmrg-parse-clause)))
