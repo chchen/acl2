@@ -26,9 +26,6 @@ example:
 
 ttmrg:
 	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/ti-bottom-up3.lisp
-	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/smt-hint-table.lisp
-	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/type-inference-topdown.lisp
-
 
 clean:
 	$(ACL2_BUILD_DIR)/clean.pl
