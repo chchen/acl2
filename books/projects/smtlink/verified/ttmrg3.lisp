@@ -323,6 +323,7 @@
       :measure (list (acl2-count x) 2)
       ((path-cond pseudo-term-set-p :default nil)
        (judgements judge-set-p :default nil)
+       (smt-judgements judge-set-p :default nil)
        (guts ttmrg-guts :default (ttmrg-guts-var nil))))
 
     ; (for now) ttmrg-guts doesn't support lambda-expressions
@@ -371,6 +372,7 @@
 
   (ttmrg->field-equiv path-cond)
   (ttmrg->field-equiv judgements)
+  (ttmrg->field-equiv smt-judgements)
   (ttmrg->field-equiv guts)
 
   ; short-cuts to access fields of ttmrg->guts
@@ -381,7 +383,7 @@
     (ttmrg->field-equiv kind)
     (defrefinement ttmrg->guts-equiv ttmrg->kind-equiv)
     (defrule ttmrg->kind-of-ttmrg
-      (equal (ttmrg->kind (ttmrg path-cond judgments guts))
+      (equal (ttmrg->kind (ttmrg path-cond judgments smt-judgements guts))
 	     (ttmrg-guts-kind guts)))
     (more-returns ttmrg->kind
       (kind :name ttmrg->kind-possibilities
@@ -417,7 +419,7 @@
 	     (implies (equal (,access-fn tterm1) (,access-fn tterm2))
 		      (,equiv-fn tterm1 tterm2)))
 	   (defrule ,access-of-constructor
-             (,field-equiv (,access-fn (ttmrg path-cond judgements guts))
+             (,field-equiv (,access-fn (ttmrg path-cond judgements smt-judgements guts))
 			   (,guts-access-fn guts)))))))
 
   (guts-shortcut :var name symbolp equal)

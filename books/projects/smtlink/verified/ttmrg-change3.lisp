@@ -290,6 +290,7 @@
 	   (ttmrg
 	     (ttmrg->path-cond tterm)
 	     (ttmrg->judgements tterm)
+             (ttmrg->smt-judgements tterm)
 	     (ttmrg-guts-if
 	       (,fn-term (ttmrg->condx tterm) ,@more-actuals)
 	       (,fn-term (ttmrg->thenx tterm) ,@more-actuals)
@@ -304,6 +305,7 @@
 	   (ttmrg
 	     (ttmrg->path-cond tterm)
 	     (ttmrg->judgements tterm)
+             (ttmrg->smt-judgements tterm)
 	     (ttmrg-guts-fncall
 	       (ttmrg->f tterm)
 	       (,fn-args (ttmrg->args tterm) ,@more-actuals)))
