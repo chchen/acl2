@@ -232,3 +232,15 @@
 
 (defthm alistp-of-pairlis$
   (alistp (acl2::pairlis$ a b)))
+
+;; The list of fields for a given FTY product type
+(define fty-prod-fields ((name symbolp)
+                          state)
+  :mode :program
+  (b* ((type-table (fty::get-flextypes (w state)))
+       ((mv & type-obj) (fty::search-deftypes-table name type-table))
+       ((unless (consp type-obj)) nil)
+       (products (fty::flexsum->prods type-obj))
+       ((unless (consp products)) nil)
+       (fields (fty::flexprod->fields (car products))))
+    (fty::flexprod-fields->names fields)))
