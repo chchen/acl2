@@ -23,40 +23,98 @@
 ; certification.  I won't clutter this book with a paean to my impatience.
 
 
-(define ttmrg-add-judge-set ((tterm ttmrg-p) (new-judges judge-set-p))
-  :returns (new-tt ttmrg-p)
-  (change-ttmrg (ttmrg-fix tterm)
-		:judgements (set::union (judge-set-fix new-judges)
-					(ttmrg->judgements tterm)))
-  ///
-  (more-returns
-    (new-tt :name ttmrg->path-cond-of-ttmrg-add-judge-set
-      (ttmrg->path-cond-equiv new-tt tterm))
+(define ttmrg-changes-returns-thms ((fn symbolp)
+                                    (rv symbolp)
+                                    (tterm symbolp)
+                                    (changed-fields symbol-listp)
+                                    (fields symbol-listp))
+  :mode :program
+  (b* (((unless (consp fields)) nil)
+       ((cons field tail) fields)
+       (thm (symcat 'ttmrg-> field '-of- fn))
+       (equiv-fn (symcat 'ttmrg-> field '-equiv))
+       (tail-rv (ttmrg-changes-returns-thms fn rv tterm changed-fields tail)))
+    (if (position field changed-fields)
+        tail-rv
+      (cons `(,rv :name ,thm
+                  (,equiv-fn ,rv ,tterm))
+            tail-rv))))
 
-    (new-tt :name ttmrg->judgements-of-ttmrg-add-judge-set
-      (equal (ttmrg->judgements new-tt)
-	     (set::union (judge-set-fix new-judges)
-			 (ttmrg->judgements tterm))))
 
-    (new-tt :name ttmrg->guts-equiv-of-ttmrg-add-judge-set
-      (ttmrg->guts-equiv new-tt tterm)))
+(define ttmrg-only-changes-fn ((name symbolp)
+                               (formals pseudo-term-listp)
+                               (body pseudo-termp)
+                               (changed-fields symbol-listp)
+                               (tterm symbolp)
+                               (rv symbolp)
+                               (returns-theorems acl2::pseudo-event-form-listp)
+                               (more-events acl2::pseudo-event-form-listp)
+                               state)
+  :mode :program
+  (let ((fields (fty-prod-fields 'ttmrg state)))
+    (mv nil
+        `(define ,name ,formals
+           :returns (,rv ttmrg-p)
+           ,body
+           ///
+           (more-returns
+            ,@(ttmrg-changes-returns-thms name rv tterm changed-fields fields)
+            ,@returns-theorems)
+           ,@more-events)
+        state)))
 
-  (local (in-theory (disable ttmrg-add-judge-set)))
 
-  (defrule ttmrg->judgements-ev-of-ttmrg-add-judge-set
-    (equal (ttmrg->judgements-ev (ttmrg-add-judge-set tterm new-judges) a)
-	   (and (all<judge-ev> (judge-set-fix new-judges) (ttmrg->expr tterm) a)
-		(ttmrg->judgements-ev tterm a)))
-    :in-theory (enable ttmrg->judgements-ev))
-  
-  (defrule ttmrg-correct-p-of-ttmrg-add-judge-set
-    (implies (and (ttmrg-correct-p tterm a)
-		  (implies (ttmrg->path-cond-ev tterm a)
-			   (all<judge-ev> (judge-set-fix new-judges)
-					  (ttmrg->expr tterm)
-					  a)))
-	     (ttmrg-correct-p (ttmrg-add-judge-set tterm new-judges) a))
-      :expand ((ttmrg-correct-p (ttmrg-add-judge-set tterm new-judges) a))))
+(defmacro ttmrg-only-changes
+          (name
+            &key
+            (formals '((tterm ttmrg-p)))
+            (body '(ttmrg-fix tterm))
+            (changed-fields 'nil)
+            (tterm 'tterm)
+            (rv 'rv)
+            (returns-theorems 'nil)
+            (more-events 'nil))
+  `(make-event
+     (ttmrg-only-changes-fn ',name
+                            ',formals
+                            ',body
+                            ',changed-fields
+                            ',tterm
+                            ',rv
+                            ',returns-theorems
+                            ',more-events
+                            state)))
+
+
+(ttmrg-only-changes
+  ttmrg-add-judge-set
+  :formals ((tterm ttmrg-p) (new-judges judge-set-p))
+  :body (change-ttmrg (ttmrg-fix tterm)
+		      :judgements (set::union (judge-set-fix new-judges)
+					      (ttmrg->judgements tterm)))
+  :changed-fields (judgements)
+  :rv new-tt
+  :returns-theorems ((new-tt :name ttmrg->judgements-of-ttmrg-add-judge-set
+                             (equal (ttmrg->judgements new-tt)
+	                            (set::union (judge-set-fix new-judges)
+			                        (ttmrg->judgements tterm)))))
+  :more-events ((local (in-theory (disable ttmrg-add-judge-set)))
+
+                (defrule ttmrg->judgements-ev-of-ttmrg-add-judge-set
+                  (equal (ttmrg->judgements-ev (ttmrg-add-judge-set tterm new-judges) a)
+	                 (and (all<judge-ev> (judge-set-fix new-judges) (ttmrg->expr tterm) a)
+		              (ttmrg->judgements-ev tterm a)))
+                  :in-theory (enable ttmrg->judgements-ev))
+
+                (defrule ttmrg-correct-p-of-ttmrg-add-judge-set
+                  (implies (and (ttmrg-correct-p tterm a)
+		                (implies (ttmrg->path-cond-ev tterm a)
+			                 (all<judge-ev> (judge-set-fix new-judges)
+					                (ttmrg->expr tterm)
+					                a)))
+	                   (ttmrg-correct-p (ttmrg-add-judge-set tterm new-judges) a))
+                  :expand ((ttmrg-correct-p (ttmrg-add-judge-set tterm new-judges) a)))))
+
 
 (define ttmrg-add-judge ((tterm ttmrg-p) (new-judge judge-p))
   :returns (new-tt ttmrg-p)
@@ -78,7 +136,7 @@
       (equal (ttmrg->judgements-ev new-tt a)
 	     (and (judge-ev (judge-fix new-judge) (ttmrg->expr tterm) a)
 		  (ttmrg->judgements-ev tterm a))))
-  
+
     (new-tt :name ttmrg-correct-p-of-ttmrg-add-judge
       (implies (and (ttmrg-correct-p tterm a)
 		    (implies (ttmrg->path-cond-ev tterm a)
@@ -371,7 +429,7 @@
       (implies (not (equal (ttmrg->kind tterm) :fncall))
 	       (equal new-tt (ttmrg-fix tterm))))))
 
-  (local (defrule lemma-if-judgements 
+  (local (defrule lemma-if-judgements
     (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))
       (implies (and (equal (ttmrg->kind tterm) :if)
 		    (acl2::any-p opts) (state-p state))
@@ -402,22 +460,22 @@
       (let ((new-tt (ttmrg-propagate-generic-term tterm opts state)))
 	(ttmrg->expr-equiv new-tt tterm))
       :flag term)
-    
+
     (defthm ttmrg->expr-of-ttmrg-propagate-generic-guts
       (let ((new-tt (ttmrg-propagate-generic-guts tterm opts state)))
 	(ttmrg->expr-equiv new-tt tterm))
       :flag guts)
-    
+
     (defthm ttmrg->expr-of-ttmrg-propagate-generic-if
       (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))
 	(ttmrg->expr-equiv new-tt tterm))
       :flag if)
-    
+
     (defthm ttmrg->expr-of-ttmrg-propagate-generic-fncall
       (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
 	(ttmrg->expr-equiv new-tt tterm))
       :flag fncall)
-    
+
     (defthm ttmrg-list->expr-list-of-ttmrg-propagate-generic-args
       (let ((new-args (ttmrg-propagate-generic-args args opts state)))
 	(ttmrg-list->expr-list-equiv new-args args))
@@ -426,22 +484,22 @@
     :hints(("Goal"
       :in-theory (enable ttmrg-propagate-generic-term
 			 ttmrg-propagate-generic-guts))))
-  
+
   (local (defrule ttmrg->path-cond-of-ttmrg-propagate-generic-fncall
     (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
       (ttmrg->path-cond-equiv new-tt tterm))
     :expand (ttmrg-propagate-generic-fncall tterm opts state)))
-  
+
   (local (defrule ttmrg->path-cond-of-ttmrg-propagate-generic-if
     (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))
       (ttmrg->path-cond-equiv new-tt tterm))
     :expand (ttmrg-propagate-generic-if tterm opts state)))
-  
+
   (local (defrule ttmrg->path-cond-of-ttmrg-propagate-generic-guts
     (let ((new-tt (ttmrg-propagate-generic-guts tterm opts state)))
       (ttmrg->path-cond-equiv new-tt tterm))
     :expand (ttmrg-propagate-generic-guts tterm opts state)))
-  
+
   (defrule ttmrg->path-cond-of-ttmrg-propagate-generic-term
     (let ((new-tt (ttmrg-propagate-generic-term tterm opts state)))
       (ttmrg->path-cond-equiv new-tt tterm))
@@ -513,7 +571,7 @@
 		      (ttmrg-correct-p tterm a))
 		 (ttmrg-correct-p new-tt a)))
       :flag term)
-    
+
     (defthm ttmrg-correct-p-of-ttmrg-propagate-generic-guts
       (let ((new-tt (ttmrg-propagate-generic-guts tterm opts state)))
 	(implies (and (ev-smtcp-meta-extract-global-facts)
@@ -521,7 +579,7 @@
 		      (ttmrg-correct-p tterm a))
 	  (ttmrg-correct-p new-tt a)))
       :flag guts)
-    
+
     (defthm ttmrg-correct-p-of-ttmrg-propagate-generic-if
       (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))
 	(implies (and (ev-smtcp-meta-extract-global-facts)
@@ -529,7 +587,7 @@
 		      (ttmrg-correct-p tterm a))
 	  (ttmrg-correct-p new-tt a)))
       :flag if)
-    
+
     (defthm ttmrg-correct-p-of-ttmrg-propagate-generic-fncall
       (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
 	(implies (and (ev-smtcp-meta-extract-global-facts)
@@ -537,7 +595,7 @@
 		      (ttmrg-correct-p tterm a))
 	  (ttmrg-correct-p new-tt a)))
       :flag fncall)
-    
+
     (defthm ttmrg-list-correct-p-of-ttmrg-propagate-generic-args
       (let ((new-args (ttmrg-propagate-generic-args args opts state)))
 	(implies (and (ev-smtcp-meta-extract-global-facts)
