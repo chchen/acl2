@@ -71,7 +71,7 @@
             (body '(ttmrg-fix tterm))
             (changed-fields 'nil)
             (tterm 'tterm)
-            (rv 'rv)
+            (rv 'new-tt)
             (returns-theorems 'nil)
             (more-events 'nil))
   `(make-event
@@ -93,7 +93,6 @@
 		      :judgements (set::union (judge-set-fix new-judges)
 					      (ttmrg->judgements tterm)))
   :changed-fields (judgements)
-  :rv new-tt
   :returns-theorems ((new-tt :name ttmrg->judgements-of-ttmrg-add-judge-set
                              (equal (ttmrg->judgements new-tt)
 	                            (set::union (judge-set-fix new-judges)
@@ -116,116 +115,124 @@
                   :expand ((ttmrg-correct-p (ttmrg-add-judge-set tterm new-judges) a)))))
 
 
-(define ttmrg-add-judge ((tterm ttmrg-p) (new-judge judge-p))
-  :returns (new-tt ttmrg-p)
-  (ttmrg-add-judge-set tterm (set::insert (judge-fix new-judge) nil))
-  ///
-  (more-returns
-    (new-tt :name ttmrg->path-cond-of-ttmrg-add-judge
-      (ttmrg->path-cond-equiv new-tt tterm))
+(ttmrg-only-changes
+  ttmrg-add-judge
+  :formals ((tterm ttmrg-p) (new-judge judge-p))
+  :body   (ttmrg-add-judge-set tterm (set::insert (judge-fix new-judge) nil))
+  :changed-fields (judgements)
+  :returns-theorems ((new-tt :name ttmrg->judgements-of-ttmrg-add-judge
+                             (equal (ttmrg->judgements new-tt)
+	                            (set::insert (judge-fix new-judge)
+			                         (ttmrg->judgements tterm))))
 
-    (new-tt :name ttmrg->judgements-of-ttmrg-add-judge
-      (equal (ttmrg->judgements new-tt)
-	     (set::insert (judge-fix new-judge)
-			 (ttmrg->judgements tterm))))
+                     (new-tt :name ttmrg->judgements-ev-of-ttmrg-add-judge
+                             (equal (ttmrg->judgements-ev new-tt a)
+	                            (and (judge-ev (judge-fix new-judge) (ttmrg->expr tterm) a)
+		                         (ttmrg->judgements-ev tterm a))))
 
-    (new-tt :name ttmrg->guts-equiv-of-ttmrg-add-judge
-      (ttmrg->guts-equiv new-tt tterm))
-
-    (new-tt :name ttmrg->judgements-ev-of-ttmrg-add-judge
-      (equal (ttmrg->judgements-ev new-tt a)
-	     (and (judge-ev (judge-fix new-judge) (ttmrg->expr tterm) a)
-		  (ttmrg->judgements-ev tterm a))))
-
-    (new-tt :name ttmrg-correct-p-of-ttmrg-add-judge
-      (implies (and (ttmrg-correct-p tterm a)
-		    (implies (ttmrg->path-cond-ev tterm a)
-			     (judge-ev (judge-fix new-judge)
-				       (ttmrg->expr tterm)
-				       a)))
-	       (ttmrg-correct-p new-tt a)))))
+                     (new-tt :name ttmrg-correct-p-of-ttmrg-add-judge
+                             (implies (and (ttmrg-correct-p tterm a)
+		                           (implies (ttmrg->path-cond-ev tterm a)
+			                            (judge-ev (judge-fix new-judge)
+				                              (ttmrg->expr tterm)
+				                              a)))
+	                              (ttmrg-correct-p new-tt a)))))
 
 
-(define ttmrg-add-path-cond-set ((tterm ttmrg-p) (new-pcs pseudo-term-set-p))
-  :returns (new-tt ttmrg-p)
-  (change-ttmrg (ttmrg-fix tterm)
-		:path-cond (set::union (pseudo-term-set-fix new-pcs)
-				       (ttmrg->path-cond tterm)))
-  ///
-  (defcong ttmrg-equiv ttmrg-equiv (ttmrg-add-path-cond-set tterm new-pcs) 1)
-  (defcong pseudo-term-set-equiv ttmrg-equiv (ttmrg-add-path-cond-set tterm new-pcs) 2)
+(ttmrg-only-changes
+  ttmrg-add-smt-judge-set
+  :formals ((tterm ttmrg-p) (new-judges judge-set-p))
+  :body (change-ttmrg (ttmrg-fix tterm)
+		      :smt-judgements (set::union (judge-set-fix new-judges)
+					          (ttmrg->smt-judgements tterm)))
+  :changed-fields (smt-judgements)
+  :returns-theorems ((new-tt :name ttmrg->smt-judgements-of-ttmrg-add-smt-judge-set
+                             (equal (ttmrg->smt-judgements new-tt)
+	                            (set::union (judge-set-fix new-judges)
+			                        (ttmrg->smt-judgements
+                                                  tterm))))))
 
-  (more-returns
-    (new-tt :name ttmrg->path-cond-of-ttmrg-add-path-cond-set
-      (equal (ttmrg->path-cond new-tt)
-	     (set::union (pseudo-term-set-fix new-pcs)
-			(ttmrg->path-cond tterm))))
+(ttmrg-only-changes
+  ttmrg-add-path-cond-set
+  :formals ((tterm ttmrg-p) (new-pcs pseudo-term-set-p))
+  :body (change-ttmrg (ttmrg-fix tterm)
+		      :path-cond (set::union (pseudo-term-set-fix new-pcs)
+				             (ttmrg->path-cond tterm)))
+  :changed-fields (path-cond)
+  :returns-theorems ((new-tt :name ttmrg->path-cond-of-ttmrg-add-path-cond-set
+                             (equal (ttmrg->path-cond new-tt)
+	                            (set::union (pseudo-term-set-fix new-pcs)
+			                        (ttmrg->path-cond tterm)))))
+  :more-events ((defcong ttmrg-equiv ttmrg-equiv (ttmrg-add-path-cond-set tterm new-pcs) 1)
+                (defcong pseudo-term-set-equiv ttmrg-equiv (ttmrg-add-path-cond-set tterm new-pcs) 2)
 
-    (new-tt :name ttmrg->judgements-equiv-of-ttmrg-add-path-cond-set
-      (ttmrg->judgements-equiv new-tt tterm))
+                (local (in-theory (disable ttmrg-add-path-cond-set)))
 
-    (new-tt :name ttmrg->guts-equiv-of-ttmrg-add-path-cond-set
-      (ttmrg->guts-equiv new-tt tterm)))
+                (defrule ttmrg->judgements-and-expr-equiv-of-ttmrg-add-path-cond-set
+                  (ttmrg->judgements-and-expr-equiv
+	            (ttmrg-add-path-cond-set tterm new-pcs)
+	            tterm)
+                  :in-theory (enable ttmrg->judgements-and-expr-equiv))
 
-    (local (in-theory (disable ttmrg-add-path-cond-set)))
+                (defrule ttmrg->path-cond-ev-of-ttmrg-add-path-cond-set
+                  (equal (ttmrg->path-cond-ev (ttmrg-add-path-cond-set tterm new-pcs) a)
+	                 (and (ttmrg->path-cond-ev tterm a)
+		              (all<pseudo-term-ev> (pseudo-term-set-fix new-pcs) a)))
+                  :in-theory (enable ttmrg->path-cond-ev))
 
-    (defrule ttmrg->judgements-and-expr-equiv-of-ttmrg-add-path-cond-set
-      (ttmrg->judgements-and-expr-equiv
-	(ttmrg-add-path-cond-set tterm new-pcs)
-	tterm)
-      :in-theory (enable ttmrg->judgements-and-expr-equiv))
+                (defrule ttmrg-correct-p-of-ttmrg-add-path-cond-set
+                  (implies (ttmrg-correct-p tterm a)
+	                   (ttmrg-correct-p (ttmrg-add-path-cond-set tterm new-pcs) a))
+                  :expand ((ttmrg-correct-p (ttmrg-add-path-cond-set tterm new-pcs) a)))))
 
-    (defrule ttmrg->path-cond-ev-of-ttmrg-add-path-cond-set
-      (equal (ttmrg->path-cond-ev (ttmrg-add-path-cond-set tterm new-pcs) a)
-	     (and (ttmrg->path-cond-ev tterm a)
-		  (all<pseudo-term-ev> (pseudo-term-set-fix new-pcs) a)))
-      :in-theory (enable ttmrg->path-cond-ev))
 
-    (defrule ttmrg-correct-p-of-ttmrg-add-path-cond-set
-      (implies (ttmrg-correct-p tterm a)
-	       (ttmrg-correct-p (ttmrg-add-path-cond-set tterm new-pcs) a))
-      :expand ((ttmrg-correct-p (ttmrg-add-path-cond-set tterm new-pcs) a))))
+(ttmrg-only-changes
+  ttmrg-add-path-cond-tterm
+  :formals ((tterm ttmrg-p) (parent ttmrg-p))
+  :body (ttmrg-add-path-cond-set tterm (ttmrg->path-cond parent))
+  :changed-fields (path-cond)
+  :returns-theorems ((new-tt :name ttmrg-correct-p-of-ttmrg-add-path-cond-tterm
+                             (implies (ttmrg-correct-p tterm a)
+	                              (ttmrg-correct-p new-tt a)))
 
-(define ttmrg-add-path-cond-tterm ((tterm ttmrg-p) (parent ttmrg-p))
-  :returns (new-tt ttmrg-p)
-  (ttmrg-add-path-cond-set tterm (ttmrg->path-cond parent))
-  ///
-  (defcong ttmrg-equiv ttmrg-equiv (ttmrg-add-path-cond-tterm tterm parent) 1)
-  (defcong ttmrg->path-cond-equiv ttmrg-equiv (ttmrg-add-path-cond-tterm tterm parent) 2)
-  (more-returns
-    (new-tt :name ttmrg->guts-equiv-of-ttmrg-add-path-cond-term
-      (ttmrg->guts-equiv new-tt tterm))
+                     (new-tt :name ttmrg->path-cond-ev-of-ttmrg-add-path-cond-tterm
+                             (equal (ttmrg->path-cond-ev new-tt a)
+	                            (and (ttmrg->path-cond-ev tterm a)
+		                         (ttmrg->path-cond-ev parent a)))
+                             :hints(("Goal" :expand (ttmrg->path-cond-ev parent a)))))
+  :more-events ((defcong ttmrg-equiv ttmrg-equiv (ttmrg-add-path-cond-tterm tterm parent) 1)
+                (defcong ttmrg->path-cond-equiv ttmrg-equiv (ttmrg-add-path-cond-tterm tterm parent) 2)))
 
-    (new-tt :name ttmrg-correct-p-of-ttmrg-add-path-cond-tterm
-      (implies (ttmrg-correct-p tterm a)
-	       (ttmrg-correct-p new-tt a)))
 
-    (new-tt :name ttmrg->path-cond-ev-of-ttmrg-add-path-cond-tterm
-      (equal (ttmrg->path-cond-ev new-tt a)
-	     (and (ttmrg->path-cond-ev tterm a)
-		  (ttmrg->path-cond-ev parent a)))
-      :hints(("Goal" :expand (ttmrg->path-cond-ev parent a))))))
+(ttmrg-only-changes
+  ttmrg-add-path-cond
+  :formals ((tterm ttmrg-p) (new-pc pseudo-termp))
+  :body (ttmrg-add-path-cond-set tterm (set::insert (pseudo-term-fix new-pc)
+                                                    nil))
+  :changed-fields (path-cond)
+  :returns-theorems ((new-tt :name ttmrg-correct-p-of-ttmrg-add-path-cond
+                             (implies (ttmrg-correct-p tterm a)
+	                              (ttmrg-correct-p new-tt a)))
 
-(define ttmrg-add-path-cond ((tterm ttmrg-p) (new-pc pseudo-termp))
-  :returns (new-tt ttmrg-p)
-  (ttmrg-add-path-cond-set tterm (set::insert (pseudo-term-fix new-pc) nil))
-  ///
-  (defcong ttmrg-equiv ttmrg-equiv (ttmrg-add-path-cond tterm new-pcs) 1)
-  (defcong pseudo-term-equiv ttmrg-equiv (ttmrg-add-path-cond tterm new-pcs) 2)
-  (more-returns
-    (new-tt :name ttmrg->guts-equiv-of-ttmrg-add-path-cond
-      (ttmrg->guts-equiv new-tt tterm))
+                     (new-tt :name ttmrg->path-cond-ev-of-ttmrg-add-path-cond
+                             (equal (ttmrg->path-cond-ev new-tt a)
+	                            (and (ev-smtcp (pseudo-term-fix new-pc) a)
+		                         (ttmrg->path-cond-ev tterm a)))
+                             :hints(("Goal" :in-theory (enable pseudo-term-ev)))))
+  :more-events ((defcong ttmrg-equiv ttmrg-equiv (ttmrg-add-path-cond tterm new-pcs) 1)
+                (defcong pseudo-term-equiv ttmrg-equiv (ttmrg-add-path-cond tterm new-pcs)
+                  2)))
 
-    (new-tt :name ttmrg-correct-p-of-ttmrg-add-path-cond
-      (implies (ttmrg-correct-p tterm a)
-	       (ttmrg-correct-p new-tt a)))
 
-    (new-tt :name ttmrg->path-cond-ev-of-ttmrg-add-path-cond
-      (equal (ttmrg->path-cond-ev new-tt a)
-	     (and (ev-smtcp (pseudo-term-fix new-pc) a)
-		  (ttmrg->path-cond-ev tterm a)))
-      :hints(("Goal" :in-theory (enable pseudo-term-ev))))))
-
+(ttmrg-only-changes
+  ttmrg-change-guts
+  :formals ((tterm ttmrg-p) (new-guts ttmrg-guts-p))
+  :body (change-ttmrg (ttmrg-fix tterm)
+                      :guts (ttmrg-guts-fix new-guts))
+  :changed-fields (guts)
+  :returns-theorems ((new-tt :name ttmrg->guts-of-ttmrg-change-guts
+                             (equal (ttmrg->guts new-tt)
+                                    (ttmrg-guts-fix new-guts)))))
 
 
 ; the functions above allow us to update the path-cond or judgements or a
