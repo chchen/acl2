@@ -47,7 +47,7 @@
     nx)
   ///
   (more-returns
-    (not-x :name correctness-of-negate 
+    (not-x :name correctness-of-negate
       (iff (ev-smtcp not-x a)
 	   (not (ev-smtcp (pseudo-term-fix x) a)))
       :hints(("Goal" :in-theory (enable negate))))))
@@ -444,7 +444,7 @@
     ((tterm ttmrg-p) (opts acl2::any-p) (state state-p))
   :ignore-ok t
   (ttmrg-update-path-cond-children tterm))
-  
+
 (in-theory (enable ttmrg-upcc-ignore-options-and-state))
 (ttmrg-propagate path-cond :pre ttmrg-upcc-ignore-options-and-state)
 (in-theory (disable ttmrg-upcc-ignore-options-and-state))
@@ -674,7 +674,7 @@
       (defrule lemma-1
 	(implies
 	  (and (judge-list-p j) (pseudo-termp expr))
-	  (equal 
+	  (equal
 	    (and-list (judge-ev-lst j expr a))
 	    (all-list<judge-ev> j expr a)))
 	:rule-classes (
@@ -748,11 +748,11 @@
 	      (:fncall (judge-set-of-fncall tterm options state)))))
     (ttmrg-add-judge-set tterm j))
   ///
-  
+
   (defrule ttmrg->path-cond-of-judgements-of-term
     (let ((new-tt (judgements-of-term tterm options state)))
       (ttmrg->path-cond-equiv new-tt tterm)))
-  
+
   (defrule ttmrg->expr-of-judgements-of-term
     (let ((new-tt (judgements-of-term tterm options state)))
       (ttmrg->expr-equiv new-tt tterm)))
@@ -851,24 +851,24 @@
 ;   Otherwise cl does not have the form of a clause constructed by
 ;     (ttmrg-clause tterm), and (ttmrg-parse-clause cl) reutrns (mv fail tterm)
 ;     where fail is not nil, and tterm satisfies ttmrg-p (to make guard and
-;     returns theorems happy.  The current implementation returns ''nil for
+;     returns theorems happy.  The current implementation returns t for
 ;     fail in this case.
 ;     TODO: write smt:fail((info acl2::any-p)) -> nil.  Then, we can
 ;     return clauses that will fail, but the info argument will give
 ;     potentially useful feedback to the user.
 
 (define ttmrg-parse-clause ((cl pseudo-termp))
-  :returns (mv (fail pseudo-termp) (tterm ttmrg-p))
-  (b* (((unless (pseudo-termp cl)) (mv ''nil (make-ttmrg)))
+  :returns (mv (fail booleanp) (tterm ttmrg-p))
+  (b* (((unless (pseudo-termp cl)) (mv t (make-ttmrg)))
        (tterm (case-match cl
 		      (('implies ('if ('ttmrg-p tterm) & &) &) tterm)
 		      (& nil)))
        ((unless (and (ttmrg-p tterm)
 		     (equal (ttmrg-clause tterm) cl)))
-	(mv ''nil (make-ttmrg))))
-    (mv ''nil (make-ttmrg)))
+	(mv t (make-ttmrg))))
+    (mv nil tterm))
   ///
-  (defrule ttmrg-parse-clause-when-good-cl
+  (defrule ttmrg-parse-clause-correct
     (mv-let
       (fail tterm)
       (ttmrg-parse-clause cl)
@@ -876,11 +876,4 @@
 	       (and (ttmrg-correct-p tterm a)
 		    (implies (ev-smtcp (ttmrg->expr tterm) a)
 			     (ev-smtcp cl a)))))
-    :in-theory (enable ttmrg-parse-clause ttmrg-clause))
-
-  (defrule ttmrg-parse-clause-when-bad-cl
-    (let ((fail (mv-nth 0 (ttmrg-parse-clause cl))))
-      (implies fail
-	       (implies (ev-smtcp fail a)
-			(ev-smtcp cl a))))
-    :in-theory (enable ttmrg-parse-clause)))
+    :in-theory (enable ttmrg-parse-clause ttmrg-clause)))
