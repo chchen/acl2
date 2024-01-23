@@ -259,10 +259,16 @@
 		(judge-set-expr (set::tail J))))
     ///
     (verify-guards judge-set-expr)
-    (defrule judge-set--ev/expr  
+    (defrule judge-set--ev/expr
       (equal (ev-smtcp `((lambda (x) ,(judge-set-expr J)) ,term) a)
 	     (all<judge-ev> j term a))
-      :in-theory (enable judge-set-expr all<judge-ev> judge-ev ev-and))))
+      :in-theory (enable judge-set-expr all<judge-ev> judge-ev ev-and)))
+
+  (deflist judge-set-list
+    :pred judge-set-list-p
+    :elt-type judge-set-p
+    :fix judge-set-list-fix
+    :true-listp t))
 
 
 (defsection pseudo-term-set ; added for path-conditions, may find broader uses in Smtlink
@@ -311,7 +317,7 @@
 		(pseudo-term-set-expr (set::tail cl))))
     ///
     (verify-guards pseudo-term-set-expr)
-    (defrule pseudo-term-set--ev/expr  
+    (defrule pseudo-term-set--ev/expr
        (equal (ev-smtcp (pseudo-term-set-expr cl) a)
 	      (all<pseudo-term-ev> cl a))
       :in-theory (enable pseudo-term-set-expr pseudo-term-ev all<pseudo-term-ev> ev-and))))
@@ -383,7 +389,7 @@
     (ttmrg->field-equiv kind)
     (defrefinement ttmrg->guts-equiv ttmrg->kind-equiv)
     (defrule ttmrg->kind-of-ttmrg
-      (equal (ttmrg->kind (ttmrg path-cond judgments smt-judgements guts))
+      (equal (ttmrg->kind (ttmrg path-cond judgements smt-judgements guts))
 	     (ttmrg-guts-kind guts)))
     (more-returns ttmrg->kind
       (kind :name ttmrg->kind-possibilities
@@ -478,7 +484,7 @@
       (equal (ttmrg-list->expr-list (cons tterm lst))
 	     (cons (ttmrg->expr tterm) (ttmrg-list->expr-list lst)))))
 
-    
+
     (define ttmrg->expr-equiv ((tterm1 ttmrg-p) (tterm2 ttmrg-p))
       :returns (ok booleanp)
       (equal (ttmrg->expr tterm1) (ttmrg->expr tterm2))
@@ -682,7 +688,38 @@
     (more-returns
       (x :name ttmrg->judgements--expr/ev
 	(equal (ev-smtcp x a) (ttmrg->judgements-ev tterm a))
-        :hints(("Goal" :in-theory (enable ttmrg->judgements-ev)))))))
+        :hints(("Goal" :in-theory (enable ttmrg->judgements-ev))))))
+
+    (define ttmrg->smt-judgements-and-expr-equiv ((tterm1 ttmrg-p) (tterm2 ttmrg-p))
+    :returns (ok booleanp)
+    (and (ttmrg->smt-judgements-equiv tterm1 tterm2)
+	 (ttmrg->expr-equiv tterm1 tterm2))
+    ///
+    (defrule ttmrg->smt-judgements-and-expr-equiv-when-smt-judgements-and-expr-equal
+      (implies (and (ttmrg->smt-judgements-equiv tterm1 tterm2)
+		    (ttmrg->expr-equiv tterm1 tterm2))
+	       (ttmrg->smt-judgements-and-expr-equiv tterm1 tterm2)))
+    (defequiv ttmrg->smt-judgements-and-expr-equiv)
+    (defrefinement ttmrg->smt-judgements-and-expr-equiv ttmrg->smt-judgements-equiv)
+    (defrefinement ttmrg->smt-judgements-and-expr-equiv ttmrg->expr-equiv)
+    (defrefinement ttmrg-equiv ttmrg->smt-judgements-and-expr-equiv))
+
+  (define ttmrg->smt-judgements-ev ((tterm ttmrg-p) (a alistp))
+    :returns (x booleanp)
+    (all<judge-ev> (ttmrg->smt-judgements tterm) (ttmrg->expr tterm) a)
+    ///
+    (defcong ttmrg->smt-judgements-and-expr-equiv equal (ttmrg->smt-judgements-ev tterm a) 1))
+
+  (define ttmrg->smt-judgements-expr ((tterm ttmrg-p))
+    :returns (x pseudo-termp :hints(("Goal" :in-theory (enable pseudo-termp))))
+    (and
+      `((lambda (x) ,(judge-set-expr (ttmrg->smt-judgements tterm)))
+	,(ttmrg->expr tterm)))
+    ///
+    (more-returns
+      (x :name ttmrg->smt-judgements--expr/ev
+	(equal (ev-smtcp x a) (ttmrg->smt-judgements-ev tterm a))
+        :hints(("Goal" :in-theory (enable ttmrg->smt-judgements-ev)))))))
 
 
 (defsection ttmrg-correct
@@ -787,7 +824,7 @@
 		 (and (ttmrg-list-correct-p (ttmrg->args tterm) a)
 		      (implies (ttmrg->path-cond-ev tterm a)
 			       (args->path-cond-ev (ttmrg->args tterm) a))))
-	:hints(("Goal" :expand (ttmrg-correct-p tterm a))))) 
+	:hints(("Goal" :expand (ttmrg-correct-p tterm a)))))
 
     (more-returns ttmrg-list-correct-p
       (ok :name ttmrg-list-correct-p-when-consp
@@ -810,7 +847,7 @@
 	:measure (ttmrg->expr-count tterm1)
 	(and
 	  (equal (ttmrg->kind tterm1) (ttmrg->kind tterm2))
-	  (case (ttmrg->kind tterm1) 
+	  (case (ttmrg->kind tterm1)
 	    (:if (list (induct-term (ttmrg->condx tterm1) (ttmrg->condx tterm2))
 		       (induct-term (ttmrg->thenx tterm1) (ttmrg->thenx tterm2))
 		       (induct-term (ttmrg->elsex tterm1) (ttmrg->elsex tterm2))))
