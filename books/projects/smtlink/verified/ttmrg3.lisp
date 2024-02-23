@@ -690,7 +690,7 @@
 	(equal (ev-smtcp x a) (ttmrg->judgements-ev tterm a))
         :hints(("Goal" :in-theory (enable ttmrg->judgements-ev))))))
 
-    (define ttmrg->smt-judgements-and-expr-equiv ((tterm1 ttmrg-p) (tterm2 ttmrg-p))
+  (define ttmrg->smt-judgements-and-expr-equiv ((tterm1 ttmrg-p) (tterm2 ttmrg-p))
     :returns (ok booleanp)
     (and (ttmrg->smt-judgements-equiv tterm1 tterm2)
 	 (ttmrg->expr-equiv tterm1 tterm2))
@@ -713,11 +713,11 @@
   (define ttmrg->smt-judgements-expr ((tterm ttmrg-p))
     :returns (x pseudo-termp :hints(("Goal" :in-theory (enable pseudo-termp))))
     (and
-      `((lambda (x) ,(judge-set-expr (ttmrg->smt-judgements tterm)))
-	,(ttmrg->expr tterm)))
+     `((lambda (x) ,(judge-set-expr (ttmrg->smt-judgements tterm)))
+       ,(ttmrg->expr tterm)))
     ///
     (more-returns
-      (x :name ttmrg->smt-judgements--expr/ev
+     (x :name ttmrg->smt-judgements--expr/ev
 	(equal (ev-smtcp x a) (ttmrg->smt-judgements-ev tterm a))
         :hints(("Goal" :in-theory (enable ttmrg->smt-judgements-ev)))))))
 
@@ -764,7 +764,10 @@
       :measure (ttmrg->expr-count tterm)
       (b* ((path-eval (ttmrg->path-cond-ev tterm a))
 	   (judge-eval (ttmrg->judgements-ev tterm a))
-	   ((unless (implies path-eval judge-eval)) nil)
+           (smt-judge-eval (ttmrg->smt-judgements-ev tterm a))
+	   ((unless (and (implies path-eval judge-eval)
+                         (implies path-eval smt-judge-eval)))
+            nil)
 	   ((if (equal (ttmrg->kind tterm) :if))
 	    (and (ttmrg-correct-p (ttmrg->condx tterm) a)
 		 (ttmrg-correct-p (ttmrg->thenx tterm) a)
@@ -794,8 +797,10 @@
       (ok :name path-cond-implies-judgements-when-ttmrg-correct-p
 	(implies
 	  ok
-	  (implies (ttmrg->path-cond-ev tterm a)
-		   (ttmrg->judgements-ev tterm a))))
+	  (and (implies (ttmrg->path-cond-ev tterm a)
+		        (ttmrg->judgements-ev tterm a))
+               (implies (ttmrg->path-cond-ev tterm a)
+                        (ttmrg->smt-judgements-ev tterm a)))))
       (ok :name ttmrg-correct-p-when-if
 	(implies (and ok (equal (ttmrg->kind tterm) :if))
 		 (and (ttmrg-correct-p (ttmrg->condx tterm) a)
@@ -913,6 +918,7 @@
       (b* (;((unless (mbt (ttmrg-p tterm))) nil)
 	   (path  (ttmrg->path-cond-expr  tterm))
 	   (judge (ttmrg->judgements-expr tterm))
+           (smt-judge (ttmrg->smt-judgements-expr tterm))
 	   (guts-expr
 	     (case (ttmrg->kind tterm)
 	       (:var ''t)
@@ -935,7 +941,10 @@
 		   (implies-expr
 		     path
 		     (args->path-cond-expr (ttmrg->args tterm))))))))
-        (and-expr (implies-expr path judge) guts-expr)))
+        (and-expr (implies-expr path judge)
+                  (and-expr
+                    (implies-expr path smt-judge)
+                    guts-expr))))
 
     (define ttmrg-list-correct-expr ((lst ttmrg-list-p))
       :returns (expr pseudo-termp)
