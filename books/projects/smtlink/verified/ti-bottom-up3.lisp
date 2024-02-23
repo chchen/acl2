@@ -7,6 +7,7 @@
 
 (in-package "SMT")
 
+(include-book "ttmrg-clause")
 (include-book "ttmrg-change3")
 (include-book "typed-term-fns")
 (include-book "judgement-fns")
@@ -27,7 +28,7 @@
   (pseudo-termp pseudo-term-listp symbol-listp  ; Mark is impatient
    boolean-listp member-equal consp-of-pseudo-lambdap
    pseudo-lambdap-of-fn-call-of-pseudo-termp lambda-of-pseudo-lambdap
-   pseudo-termp-when-pseudo-term-syntax-p consp-of-is-conjunct? default-car
+   default-car
    (:type-prescription pseudo-lambdap)))))
 
 
@@ -364,6 +365,7 @@
 		       :args new-args)))
 	(make-ttmrg :path-cond (ttmrg->path-cond tterm)
 		    :judgements (ttmrg->judgements tterm)
+                    :smt-judgements (ttmrg->smt-judgements tterm)
 		    :guts new-guts))))
   ///
   (defcong ttmrg-equiv ttmrg-equiv (ttmrg-update-path-cond-children tterm) 1)
@@ -372,7 +374,10 @@
       (ttmrg->path-cond-equiv new-tt tterm))
 
     (new-tt :name ttmrg->judgements-of-ttmrg-update-path-cond-children
-      (ttmrg->judgements-equiv new-tt tterm))
+            (ttmrg->judgements-equiv new-tt tterm))
+
+    (new-tt :name ttmrg->smt-judgements-of-ttmrg-update-path-cond-children
+            (ttmrg->smt-judgements-equiv new-tt tterm))
 
     (new-tt :name ttmrg->kind-of-ttmrg-update-path-cond-children
       (ttmrg->kind-equiv new-tt tterm))))
@@ -414,8 +419,10 @@
 
 (local (defrule ttmrg->judgements-and-expr-of-ttmrg-update-path-cond-children
   (let ((new-tt (ttmrg-update-path-cond-children tterm)))
-    (ttmrg->judgements-and-expr-equiv new-tt tterm))
-  :in-theory (enable ttmrg->judgements-and-expr-equiv)
+    (and (ttmrg->judgements-and-expr-equiv new-tt tterm)
+         (ttmrg->smt-judgements-and-expr-equiv new-tt tterm)))
+  :in-theory (enable ttmrg->judgements-and-expr-equiv
+                     ttmrg->smt-judgements-and-expr-equiv)
   :prep-lemmas (
     (defrule lemma-fncall-f
       (let ((new-tt (ttmrg-update-path-cond-children tterm)))
@@ -782,26 +789,6 @@
 (in-theory (disable ttmrg-upcc-ignore-options-and-state))
 
 
-; ttmrg-clause: produce an ACL2 clause corresponding to tterm
-; This version constructs an expression with 'implies' and 'if' where the
-; if-expression is a "translated" and.  We might want to just create the
-; clause directly:
-; (list ,(not (ttmrg-p (quote ,tterm)))
-;       ,(not ,(ttmrg-correct-expr tterm))
-;       ,(ttmrg->expr tterm))
-; But I'm leaving it in the current form for now to be close to Yan's
-; representation.  The big difference between ttmrg-clause and what Yan
-; does is that I'm including tterm in the goal so the next clause processor
-; can recover it.
-(define ttmrg-clause ((tterm ttmrg-p))
-  :returns (cl pseudo-termp :hints(("Goal" :in-theory (enable pseudo-termp))))
-  `(implies
-     (if (ttmrg-p (quote ,tterm))
-       ,(ttmrg-correct-expr tterm)
-       ''nil)
-     ,(ttmrg->expr tterm)))
-
-
 (define type-judge-bottomup-cp ((cl pseudo-term-listp)
                                 (smtlink-hint t)
                                 state)
@@ -817,8 +804,7 @@
        (the-hint
         `(:clause-processor (,next-cp clause ',smtlink-hint state)))
        (new-cl (ttmrg-clause new-tt))
-       (hinted-goal `((hint-please ',the-hint) ,new-cl))
-       (- (cw "type-judge-bottomup-cp: ~q0" hinted-goal)))
+       (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 
 
@@ -836,44 +822,3 @@
   :expand (type-judge-bottomup-cp cl hints state)
   :in-theory (enable ttmrg-clause)
   :rule-classes :clause-processor)
-
-
-; (ttmrg-parse-clause cl) -> (mv fail tterm)
-;   cl should be the pseudo-termp returned by (disjoin clause) where clause
-;     is a list of disjuncts, where each disjunct satisfies termp.
-;   If cl has the form of a clause constructed by (ttmrg-clause tterm),
-;     ttmrg-parse-clause returns (mv nil tterm).
-;     In this case, we ensure (see ttmrg-parse-clause-when-good-cl) that
-;       for any context, a, either (ttmrg-correct-p tterm a) holds or cl
-;       is vacously satisified, e.g. a type-hypotheses of cl is violated
-;       in context a.  We also ensure that (ttmrg->expr tterm) implies
-;       cl in any context a.
-;   Otherwise cl does not have the form of a clause constructed by
-;     (ttmrg-clause tterm), and (ttmrg-parse-clause cl) reutrns (mv fail tterm)
-;     where fail is not nil, and tterm satisfies ttmrg-p (to make guard and
-;     returns theorems happy.  The current implementation returns t for
-;     fail in this case.
-;     TODO: write smt:fail((info acl2::any-p)) -> nil.  Then, we can
-;     return clauses that will fail, but the info argument will give
-;     potentially useful feedback to the user.
-
-(define ttmrg-parse-clause ((cl pseudo-termp))
-  :returns (mv (fail booleanp) (tterm ttmrg-p))
-  (b* (((unless (pseudo-termp cl)) (mv t (make-ttmrg)))
-       (tterm (case-match cl
-		      (('implies ('if ('ttmrg-p tterm) & &) &) tterm)
-		      (& nil)))
-       ((unless (and (ttmrg-p tterm)
-		     (equal (ttmrg-clause tterm) cl)))
-	(mv t (make-ttmrg))))
-    (mv nil tterm))
-  ///
-  (defrule ttmrg-parse-clause-correct
-    (mv-let
-      (fail tterm)
-      (ttmrg-parse-clause cl)
-      (implies (not fail)
-	       (and (ttmrg-correct-p tterm a)
-		    (implies (ev-smtcp (ttmrg->expr tterm) a)
-			     (ev-smtcp cl a)))))
-    :in-theory (enable ttmrg-parse-clause ttmrg-clause)))

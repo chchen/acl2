@@ -105,6 +105,12 @@
 		              (ttmrg->judgements-ev tterm a)))
                   :in-theory (enable ttmrg->judgements-ev))
 
+                (defrule ttmrg->smt-judgements-and-expr-equiv-of-ttmrg-add-judge-set
+                  (ttmrg->smt-judgements-and-expr-equiv
+	            (ttmrg-add-judge-set tterm new-judges)
+	            tterm)
+                  :in-theory (enable ttmrg->smt-judgements-and-expr-equiv))
+
                 (defrule ttmrg-correct-p-of-ttmrg-add-judge-set
                   (implies (and (ttmrg-correct-p tterm a)
 		                (implies (ttmrg->path-cond-ev tterm a)
@@ -115,28 +121,28 @@
                   :expand ((ttmrg-correct-p (ttmrg-add-judge-set tterm new-judges) a)))))
 
 
-(ttmrg-only-changes
-  ttmrg-add-judge
-  :formals ((tterm ttmrg-p) (new-judge judge-p))
-  :body   (ttmrg-add-judge-set tterm (set::insert (judge-fix new-judge) nil))
-  :changed-fields (judgements)
-  :returns-theorems ((new-tt :name ttmrg->judgements-of-ttmrg-add-judge
-                             (equal (ttmrg->judgements new-tt)
-	                            (set::insert (judge-fix new-judge)
-			                         (ttmrg->judgements tterm))))
+;; (ttmrg-only-changes
+;;   ttmrg-add-judge
+;;   :formals ((tterm ttmrg-p) (new-judge judge-p))
+;;   :body   (ttmrg-add-judge-set tterm (set::insert (judge-fix new-judge) nil))
+;;   :changed-fields (judgements)
+;;   :returns-theorems ((new-tt :name ttmrg->judgements-of-ttmrg-add-judge
+;;                              (equal (ttmrg->judgements new-tt)
+;; 	                            (set::insert (judge-fix new-judge)
+;; 			                         (ttmrg->judgements tterm))))
 
-                     (new-tt :name ttmrg->judgements-ev-of-ttmrg-add-judge
-                             (equal (ttmrg->judgements-ev new-tt a)
-	                            (and (judge-ev (judge-fix new-judge) (ttmrg->expr tterm) a)
-		                         (ttmrg->judgements-ev tterm a))))
+;;                      (new-tt :name ttmrg->judgements-ev-of-ttmrg-add-judge
+;;                              (equal (ttmrg->judgements-ev new-tt a)
+;; 	                            (and (judge-ev (judge-fix new-judge) (ttmrg->expr tterm) a)
+;; 		                         (ttmrg->judgements-ev tterm a))))
 
-                     (new-tt :name ttmrg-correct-p-of-ttmrg-add-judge
-                             (implies (and (ttmrg-correct-p tterm a)
-		                           (implies (ttmrg->path-cond-ev tterm a)
-			                            (judge-ev (judge-fix new-judge)
-				                              (ttmrg->expr tterm)
-				                              a)))
-	                              (ttmrg-correct-p new-tt a)))))
+;;                      (new-tt :name ttmrg-correct-p-of-ttmrg-add-judge
+;;                              (implies (and (ttmrg-correct-p tterm a)
+;; 		                           (implies (ttmrg->path-cond-ev tterm a)
+;; 			                            (judge-ev (judge-fix new-judge)
+;; 				                              (ttmrg->expr tterm)
+;; 				                              a)))
+;; 	                              (ttmrg-correct-p new-tt a)))))
 
 
 (ttmrg-only-changes
@@ -150,7 +156,30 @@
                              (equal (ttmrg->smt-judgements new-tt)
 	                            (set::union (judge-set-fix new-judges)
 			                        (ttmrg->smt-judgements
-                                                  tterm))))))
+                                                  tterm)))))
+  :more-events ((local (in-theory (disable ttmrg-add-smt-judge-set)))
+
+                (defrule ttmrg->smt-judgements-ev-of-ttmrg-add-smt-judge-set
+                  (equal (ttmrg->smt-judgements-ev (ttmrg-add-smt-judge-set tterm new-judges) a)
+	                 (and (all<judge-ev> (judge-set-fix new-judges) (ttmrg->expr tterm) a)
+		              (ttmrg->smt-judgements-ev tterm a)))
+                  :in-theory (enable ttmrg->smt-judgements-ev))
+
+                (defrule ttmrg->judgements-and-expr-equiv-of-ttmrg-add-smt-judge-set
+                  (ttmrg->judgements-and-expr-equiv
+	            (ttmrg-add-smt-judge-set tterm new-judges)
+	            tterm)
+                  :in-theory (enable ttmrg->judgements-and-expr-equiv))
+
+                (defrule ttmrg-correct-p-of-ttmrg-add-smt-judge-set
+                  (implies (and (ttmrg-correct-p tterm a)
+		                (implies (ttmrg->path-cond-ev tterm a)
+			                 (all<judge-ev> (judge-set-fix new-judges)
+					                (ttmrg->expr tterm)
+					                a)))
+	                   (ttmrg-correct-p (ttmrg-add-smt-judge-set tterm new-judges) a))
+                  :expand ((ttmrg-correct-p (ttmrg-add-smt-judge-set tterm new-judges) a)))))
+
 
 (ttmrg-only-changes
   ttmrg-add-path-cond-set
@@ -173,6 +202,12 @@
 	            (ttmrg-add-path-cond-set tterm new-pcs)
 	            tterm)
                   :in-theory (enable ttmrg->judgements-and-expr-equiv))
+
+                (defrule ttmrg->smt-judgements-and-expr-equiv-of-ttmrg-add-path-cond-set
+                  (ttmrg->smt-judgements-and-expr-equiv
+	            (ttmrg-add-path-cond-set tterm new-pcs)
+	            tterm)
+                  :in-theory (enable ttmrg->smt-judgements-and-expr-equiv))
 
                 (defrule ttmrg->path-cond-ev-of-ttmrg-add-path-cond-set
                   (equal (ttmrg->path-cond-ev (ttmrg-add-path-cond-set tterm new-pcs) a)
@@ -417,8 +452,18 @@
   (local (defrule lemma-fncall-judgements
     (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
       (implies (and (equal (ttmrg->kind tterm) :fncall)
-		    (acl2::any-p opts) (state-p state))
+		    (acl2::any-p opts)
+                    (acl2::any-p state))
 	(ttmrg->judgements-equiv new-tt tterm)))
+    :expand (ttmrg-propagate-generic-fncall tterm opts state)
+    :rule-classes (:forward-chaining)))
+
+  (local (defrule lemma-fncall-smt-judgements
+    (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
+      (implies (and (equal (ttmrg->kind tterm) :fncall)
+		    (acl2::any-p opts)
+                    (acl2::any-p state))
+	(ttmrg->smt-judgements-equiv new-tt tterm)))
     :expand (ttmrg-propagate-generic-fncall tterm opts state)
     :rule-classes (:forward-chaining)))
 
@@ -439,12 +484,22 @@
   (local (defrule lemma-if-judgements
     (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))
       (implies (and (equal (ttmrg->kind tterm) :if)
-		    (acl2::any-p opts) (state-p state))
+		    (acl2::any-p opts)
+                    (acl2::any-p state))
 	(ttmrg->judgements-equiv new-tt tterm)))
     :expand (ttmrg-propagate-generic-if tterm opts state)
     :rule-classes (:forward-chaining)))
 
-  (local (defrule lemma-if-expr
+  (local (defrule lemma-if-smt-judgements
+    (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))
+      (implies (and (equal (ttmrg->kind tterm) :if)
+		    (acl2::any-p opts)
+                    (acl2::any-p state))
+	(ttmrg->smt-judgements-equiv new-tt tterm)))
+    :expand (ttmrg-propagate-generic-if tterm opts state)
+    :rule-classes (:forward-chaining)))
+
+  (local (defrule lemma-if-expr-judgements
     (let ((new-tt (ttmrg-propagate-generic-if tterm opts state))
           (new-condx (ttmrg-propagate-generic-term (ttmrg->condx tterm) opts state))
 	  (new-thenx (ttmrg-propagate-generic-term (ttmrg->thenx tterm) opts state))
@@ -455,7 +510,20 @@
 	     (ttmrg->expr-equiv new-thenx (ttmrg->thenx tterm))
 	     (ttmrg->expr-equiv new-elsex (ttmrg->elsex tterm)))
 	(ttmrg->judgements-and-expr-equiv new-tt tterm)))
-    :in-theory (enable ttmrg->expr )))
+    :in-theory (enable ttmrg->expr)))
+
+  (local (defrule lemma-if-expr-smt-judgements
+    (let ((new-tt (ttmrg-propagate-generic-if tterm opts state))
+          (new-condx (ttmrg-propagate-generic-term (ttmrg->condx tterm) opts state))
+	  (new-thenx (ttmrg-propagate-generic-term (ttmrg->thenx tterm) opts state))
+	  (new-elsex (ttmrg-propagate-generic-term (ttmrg->elsex tterm) opts state)))
+      (implies
+	(and (equal (ttmrg->kind tterm) :if)
+	     (ttmrg->expr-equiv new-condx (ttmrg->condx tterm))
+	     (ttmrg->expr-equiv new-thenx (ttmrg->thenx tterm))
+	     (ttmrg->expr-equiv new-elsex (ttmrg->elsex tterm)))
+	(ttmrg->smt-judgements-and-expr-equiv new-tt tterm)))
+    :in-theory (enable ttmrg->expr)))
 
   (local (defrule lemma-if-trivial
     (let ((new-tt (ttmrg-propagate-generic-if tterm opts st)))
@@ -536,16 +604,26 @@
 			(equal (ttmrg->kind new-tt) :fncall))))
 	:expand ((ttmrg-propagate-generic-fncall tterm opts state)))
       (defrule lemma-2
-	(let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
-	  (ttmrg->judgements-equiv new-tt tterm))
-	:expand ((ttmrg-propagate-generic-fncall tterm opts state)))
+        (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
+          (and
+            (ttmrg->judgements-equiv new-tt tterm)
+            (ttmrg->smt-judgements-equiv new-tt tterm)))
+        :expand ((ttmrg-propagate-generic-fncall tterm opts state)))
       (defrule lemma-3
 	(let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
-	  (ttmrg->judgements-and-expr-equiv new-tt tterm))
+          (implies
+            (and (acl2::any-p opts)
+                                     (acl2::any-p state))
+	    (ttmrg->judgements-and-expr-equiv new-tt tterm)))
 	:in-theory (enable ttmrg->judgements-and-expr-equiv)
 ;	:expand ((ttmrg->judgements-and-expr-equiv
 ;		   (ttmrg-propagate-generic-fncall tterm opts state) tterm))
-	:cases ((equal (ttmrg->kind tterm) :fncall))))))
+	:cases ((equal (ttmrg->kind tterm) :fncall)))
+      (defrule lemma-4
+        (let ((new-tt (ttmrg-propagate-generic-fncall tterm opts state)))
+          (ttmrg->smt-judgements-and-expr-equiv new-tt tterm))
+        :in-theory (enable ttmrg->smt-judgements-and-expr-equiv)
+        :cases ((equal (ttmrg->kind tterm) :fncall))))))
 
   (local (defrule lemma-if-correct
     (let ((new-tt (ttmrg-propagate-generic-if tterm opts state)))

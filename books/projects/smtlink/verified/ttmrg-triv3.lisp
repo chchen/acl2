@@ -58,6 +58,7 @@
     (make-ttmrg
       :path-cond nil
       :judgements nil
+      :smt-judgements nil
       :guts
 	(b* (((if (symbolp term))
 	      (make-ttmrg-guts-var :name term))
@@ -101,10 +102,12 @@
       :in-theory (enable ttmrg->path-cond-ev)
       :expand (make-ttmrg-trivial term)))
 
-    (local (acl2::defruled ttmrg->judgements-ev-of-make-ttmrg-trivial
-      (ttmrg->judgements-ev (make-ttmrg-trivial term) a)
-      :in-theory (enable ttmrg->judgements-ev)
-      :expand (make-ttmrg-trivial term)))
+    (local (acl2::defruled ttmrg->judgements-evs-of-make-ttmrg-trivial
+             (and
+               (ttmrg->judgements-ev (make-ttmrg-trivial term) a)
+               (ttmrg->smt-judgements-ev (make-ttmrg-trivial term) a))
+             :in-theory (enable ttmrg->judgements-ev ttmrg->smt-judgements-ev)
+             :expand (make-ttmrg-trivial term)))
 
     (defthm-make-ttmrg-trivial-flag
       (defthm ttmrg-correct-p-of-make-ttmrg-trivial
@@ -120,7 +123,7 @@
 	; a computed hint because all of the subgoals for make-ttmrg-trivial
 	; need an instantiation of ttmrg->judgements-ev-of-make-ttmrg-trivial.
 	(and (member-equal '(not (acl2::flag-is 'term)) clause)
-	     '(:use ((:instance ttmrg->judgements-ev-of-make-ttmrg-trivial))))))))
+	     '(:use ((:instance ttmrg->judgements-evs-of-make-ttmrg-trivial))))))))
 
 
 (defines pseudo-term-syntax
