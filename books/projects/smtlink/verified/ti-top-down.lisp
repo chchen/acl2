@@ -10,6 +10,7 @@
 (include-book "std/util/bstar" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
+(include-book "std/util/defval" :dir :system)
 (include-book "centaur/fty/top" :dir :system)
 (include-book "tools/defevaluator-fast" :dir :system)
 (include-book "clause-processors/just-expand" :dir :system)
@@ -17,18 +18,48 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "ttmrg-change3")
+(include-book "ttmrg-clause")
 (include-book "typed-term-fns")
 (include-book "returns-judgement")
 (include-book "judgement-fns")
 (include-book "ti-bottom-up3")
-(include-book "../utils/fresh-vars")
 
 (set-state-ok t)
 (set-bogus-mutual-recursion-ok t)
 
 
-(define refine-judgement-helper ((judgements judge-set-p)
-                                 (recognizers pseudo-term-listp))
+(defval *top-down-priority*
+  '((rationalp smt::x)
+    (integerp smt::x)
+    (booleanp smt::x)
+    (symbolp smt::x)))
+
+
+;; (defcong judge-set-equiv equal (set::in element set) 2)
+
+(defrule set-membership-fix-elimination
+	 (implies (set::in e (judge-set-fix (double-rewrite s)))
+		  (set::in e s))
+         :in-theory (enable judge-set-fix
+                            set::in))
+
+(defrule set-subset-fix-elimination
+	 (implies (set::subset e (judge-set-fix (double-rewrite s)))
+		  (set::subset e s))
+         :in-theory (enable judge-set-fix
+                            set::subset))
+
+
+(defrule set-intersection-fix-elimination
+	 (implies (set::intersect (judge-set-fix (double-rewrite a))
+				  (judge-set-fix (double-rewrite b)))
+		  (set::intersect a b))
+	 :in-theory (enable judge-set-fix
+                            set::intersect))
+
+
+(define refine-judgement-helper ((recognizers pseudo-term-listp)
+                                 (judgements judge-set-p))
   :measure (acl2-count recognizers)
   :returns (rv judge-set-p)
   (b* ((judgements (judge-set-fix judgements))
@@ -38,20 +69,30 @@
        ((cons head tail) recognizers))
     (if (set::in head judgements)
         (set::insert head nil)
-      (refine-judgement-helper judgements tail))))
+      (refine-judgement-helper tail judgements)))
+  ///
+  (fty::deffixequiv refine-judgement-helper)
+  (more-returns
+   (rv :name refine-judgement-helper-subset-judgements
+       (implies (equal (judge-set-fix judgements) j-fix)
+       (set::subset rv j-fix)))))
 
 
 (define refine-judgement ((judgements judge-set-p)
                           (top judge-set-p))
   :returns (rv judge-set-p)
-  (b* ((static-priority-list '((rationalp smt::x)
-                               (integerp smt::x)
-                               (booleanp smt::x)
-                               (symbolp smt::x)))
-       (judgements (judge-set-fix judgements))
+  (b* ((judgements (judge-set-fix judgements))
+       (recognizers (pseudo-term-list-fix *top-down-priority*))
        (top (judge-set-fix top))
        (permissible (set::intersect judgements top)))
-    (refine-judgement-helper permissible static-priority-list)))
+    (refine-judgement-helper recognizers permissible))
+  ///
+  (fty::deffixequiv refine-judgement)
+  (more-returns
+   (rv :name refine-judgement-subset-intersect-judgements-top
+       (implies (and (equal (judge-set-fix judgements) j-fix)
+                     (equal (judge-set-fix top) t-fix))
+                (set::subset rv (set::intersect j-fix t-fix))))))
 
 
 (define parse-judge-sets ((exprs pseudo-term-listp)
@@ -65,6 +106,7 @@
           (parse-judge-sets (cdr exprs) (cdr judgements)))))
 
 
+;; A theorem that shows a evaluation relation would be nice here?
 (define refine-terminal ((tterm ttmrg-p)
                          (top judge-set-p))
   :guard (or (equal (ttmrg->kind tterm) :quote)
@@ -197,3 +239,39 @@
         (:fncall (refine-fn tterm top options state)))))
   ///
   (verify-guards refine-ttmrg))
+
+
+(define type-judge-topdown-cp ((cl pseudo-term-listp)
+                               (smtlink-hint t)
+                               state)
+  (b* (((unless (pseudo-term-listp cl)) (value (list nil)))
+       ((unless (smtlink-hint-p smtlink-hint)) (value (list nil)))
+       (goal (disjoin cl))
+       ((type-options type-opt) (construct-type-options smtlink-hint goal))
+       ((mv fail tterm) (ttmrg-parse-clause goal))
+       ((if fail) (value (list nil)))
+       (next-cp (cdr (assoc-equal 'type-judge-topdown *SMT-architecture*)))
+       ((if (null next-cp)) (value (list nil)))
+       (bool (set::insert (judge-fix '(booleanp smt::x)) '()))
+       (new-tt (refine-ttmrg tterm bool type-opt state))
+       (the-hint
+         `(:clause-processor (,next-cp clause ',smtlink-hint state)))
+       (new-cl (ttmrg-clause new-tt))
+       (hinted-goal `((hint-please ',the-hint) ,new-cl)))
+    (value (list hinted-goal))))
+
+
+;; (defrule correctness-of-type-judge-topdown-cp
+;;   (implies (and (ev-smtcp-meta-extract-global-facts)
+;;                 (pseudo-term-listp cl)
+;;                 (alistp a)
+;;                 (ev-smtcp
+;;                  (conjoin-clauses
+;;                   (acl2::clauses-result
+;;                    (type-judge-topdown-cp cl hints state)))
+;;                  a))
+;;            (ev-smtcp (disjoin cl) a))
+;;   :do-not-induct t
+;;   :expand (type-judge-topdown-cp cl hints state)
+;;   :in-theory (enable ttmrg-clause)
+;;   :rule-classes :clause-processor)
