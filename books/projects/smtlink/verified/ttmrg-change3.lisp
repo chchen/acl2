@@ -57,6 +57,7 @@
            :returns (,rv ttmrg-p)
            ,body
            ///
+           (fty::deffixequiv ,name)
            (more-returns
             ,@(ttmrg-changes-returns-thms name rv tterm changed-fields fields)
             ,@returns-theorems)
@@ -178,7 +179,16 @@
 					                (ttmrg->expr tterm)
 					                a)))
 	                   (ttmrg-correct-p (ttmrg-add-smt-judge-set tterm new-judges) a))
-                  :expand ((ttmrg-correct-p (ttmrg-add-smt-judge-set tterm new-judges) a)))))
+                  :expand ((ttmrg-correct-p (ttmrg-add-smt-judge-set tterm new-judges) a)))
+
+                (defrule ttmrg-add-smt-judge-set-subset-preserves-ttmrg-correct-p
+	          (implies (and (ttmrg-correct-p tterm a)
+		                (set::subset smt-judges (ttmrg->judgements tterm)))
+		           (ttmrg-correct-p (ttmrg-add-smt-judge-set tterm smt-judges)
+		                            a))
+	          :cases ((judge-set-p smt-judges))
+	          :expand ((ttmrg-correct-p tterm a)
+		           (ttmrg->judgements-ev tterm a)))))
 
 
 (ttmrg-only-changes
