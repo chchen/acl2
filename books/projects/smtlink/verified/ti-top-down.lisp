@@ -35,29 +35,6 @@
     (symbolp smt::x)))
 
 
-;; (defcong judge-set-equiv equal (set::in element set) 2)
-
-(defrule set-membership-fix-elimination
-	 (implies (set::in e (judge-set-fix (double-rewrite s)))
-		  (set::in e s))
-         :in-theory (enable judge-set-fix
-                            set::in))
-
-(defrule set-subset-fix-elimination
-	 (implies (set::subset e (judge-set-fix (double-rewrite s)))
-		  (set::subset e s))
-         :in-theory (enable judge-set-fix
-                            set::subset))
-
-
-(defrule set-intersection-fix-elimination
-	 (implies (set::intersect (judge-set-fix (double-rewrite a))
-				  (judge-set-fix (double-rewrite b)))
-		  (set::intersect a b))
-	 :in-theory (enable judge-set-fix
-                            set::intersect))
-
-
 (define refine-judgement-helper ((recognizers pseudo-term-listp)
                                  (judgements judge-set-p))
   :measure (acl2-count recognizers)
@@ -73,9 +50,11 @@
   ///
   (fty::deffixequiv refine-judgement-helper)
   (more-returns
-   (rv :name refine-judgement-helper-subset-judgements
-       (implies (equal (judge-set-fix judgements) j-fix)
-       (set::subset rv j-fix)))))
+   (rv :name refine-judgement-helper-subset-superset-judgements
+       (implies (and (judge-set-p judgements)
+		     (set::subset judgements superset))
+		(set::subset rv superset))
+       :hints (("Goal" :in-theory (enable set::subset-in))))))
 
 
 (define refine-judgement ((judgements judge-set-p)
@@ -89,24 +68,57 @@
   ///
   (fty::deffixequiv refine-judgement)
   (more-returns
-   (rv :name refine-judgement-subset-intersect-judgements-top
-       (implies (and (equal (judge-set-fix judgements) j-fix)
-                     (equal (judge-set-fix top) t-fix))
-                (set::subset rv (set::intersect j-fix t-fix))))))
+   (rv :name refine-judgement-subset-judgements-top
+       (implies (and (judge-set-p judgements)
+		     (judge-set-p top))
+                (and (set::subset rv judgements)
+		     (set::subset rv top))))))
 
 
-(define parse-judge-sets ((exprs pseudo-term-listp)
-                          (judgements pseudo-term-listp))
+(define parse-judge-sets-correct-p ((judge-sets judge-set-list-p)
+                                    (terms pseudo-term-listp)
+                                    (judge-pts pseudo-term-listp)
+                                    (a alistp))
+  :returns (ok booleanp)
+  :measure (len judge-sets)
+  (b* ((judge-sets (judge-set-list-fix judge-sets))
+       (terms (pseudo-term-list-fix terms))
+       (judge-pts (pseudo-term-list-fix judge-pts))
+       ((unless (and (consp judge-sets)
+                     (consp terms)
+                     (consp judge-pts)))
+        t)
+       (judge-set (judge-set-fix (car judge-sets)))
+       (term (pseudo-term-fix (car terms)))
+       (judge-pt (pseudo-term-fix (car judge-pts))))
+    (and (implies
+           (not (equal judge-set '((bad-judgement x))))
+           (iff (all<judge-ev> judge-set term a)
+                (ev-smtcp judge-pt a)))
+         (parse-judge-sets-correct-p (cdr judge-sets)
+                                     (cdr terms)
+                                     (cdr judge-pts)
+                                     a))))
+
+
+(define parse-judge-sets ((terms pseudo-term-listp)
+                          (judge-pts pseudo-term-listp))
   :returns (rv judge-set-list-p)
-  (b* ((exprs (pseudo-term-list-fix exprs))
-       (judgements (pseudo-term-list-fix judgements))
-       ((unless (consp exprs)) nil)
-       ((unless (consp judgements)) nil))
-    (cons (parse-judge-set (car exprs) (car judgements))
-          (parse-judge-sets (cdr exprs) (cdr judgements)))))
+  (b* ((terms (pseudo-term-list-fix terms))
+       (judge-pts (pseudo-term-list-fix judge-pts))
+       ((unless (consp terms)) nil)
+       ((unless (consp judge-pts)) nil))
+    (cons (parse-judge-set (car terms) (car judge-pts))
+          (parse-judge-sets (cdr terms) (cdr judge-pts))))
+  ///
+  (more-returns
+   (rv :name parse-judge-sets-correct
+       (parse-judge-sets-correct-p rv terms judge-pts a)
+       :hints (("Goal"
+                 :in-theory (enable parse-judge-sets-correct-p)
+                 :induct (parse-judge-sets terms judge-pts))))))
 
 
-;; A theorem that shows a evaluation relation would be nice here?
 (define refine-terminal ((tterm ttmrg-p)
                          (top judge-set-p))
   :guard (or (equal (ttmrg->kind tterm) :quote)
@@ -119,7 +131,16 @@
         (make-ttmrg-trivial nil))
        (judgements (ttmrg->judgements tterm))
        (new-judgement (refine-judgement judgements top)))
-    (ttmrg-add-smt-judge-set tterm new-judgement)))
+    (ttmrg-add-smt-judge-set tterm new-judgement))
+  ///
+  (fty::deffixequiv refine-terminal)
+  (more-returns
+   (rv :name refine-terminal-preserves-ttmrg-correct-p
+       (implies (and (ttmrg-correct-p tterm a)
+		     (judge-set-p top)
+		     (or (equal (ttmrg->kind tterm) :quote)
+			 (equal (ttmrg->kind tterm) :var)))
+		(ttmrg-correct-p rv a)))))
 
 
 (define ttmrg-smt-judgement-expr ((tterm ttmrg-p))
