@@ -277,7 +277,10 @@
   :changed-fields (guts)
   :returns-theorems ((new-tt :name ttmrg->guts-of-ttmrg-change-guts
                              (equal (ttmrg->guts new-tt)
-                                    (ttmrg-guts-fix new-guts)))))
+                                    (ttmrg-guts-fix new-guts))))
+  :more-events ((defcong ttmrg-equiv ttmrg-equiv (ttmrg-change-guts tterm new-guts) 1)
+                (defcong ttmrg-guts-equiv ttmrg-equiv (ttmrg-change-guts tterm new-guts)
+                  2)))
 
 
 ; the functions above allow us to update the path-cond or judgements or a
