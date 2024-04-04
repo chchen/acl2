@@ -35,6 +35,272 @@
     (symbolp smt::x)))
 
 
+(defval *bool-judgement*
+  (set::insert (judge-fix '(booleanp smt::x))
+               '()))
+
+
+(defines top-down-inv
+  :verify-guards nil
+  :well-founded-relation l<
+
+  (define top-down-args-inv ((args1 ttmrg-list-p)
+			     (args2 ttmrg-list-p))
+    :measure (list (ttmrg-list->expr-list-count args1) 1 0)
+    :returns (ok booleanp)
+    (b* ((args1 (ttmrg-list-fix args1))
+	 (args2 (ttmrg-list-fix args2))
+	 ((if (and (endp args1)
+		   (endp args2)))
+	  t)
+	 ((if (and (consp args1)
+		   (consp args2)))
+	  (and (top-down-inv (car args1)
+			     (car args2))
+	       (top-down-args-inv (cdr args1)
+				  (cdr args2)))))
+      nil))
+
+  (define top-down-inv ((tterm1 ttmrg-p)
+			(tterm2 ttmrg-p))
+    :measure (list (ttmrg->expr-count tterm1) 2 0)
+    :returns (ok booleanp)
+    (b* ((tterm1 (ttmrg-fix tterm1))
+	 (tterm2 (ttmrg-fix tterm2))
+	 ((unless (and (ttmrg->kind-equiv tterm1 tterm2)
+		       (ttmrg->path-cond-equiv tterm1 tterm2)
+		       (ttmrg->judgements-equiv tterm1 tterm2)
+		       (set::subset (ttmrg->smt-judgements tterm2)
+				    (ttmrg->judgements tterm1))))
+	  nil))
+      (case (ttmrg->kind tterm1)
+	(:quote (ttmrg->val-equiv tterm1 tterm2))
+	(:var (ttmrg->name-equiv tterm1 tterm2))
+	(:if (and (top-down-inv (ttmrg->condx tterm1)
+				(ttmrg->condx tterm2))
+		  (top-down-inv (ttmrg->thenx tterm1)
+				(ttmrg->thenx tterm2))
+		  (top-down-inv (ttmrg->elsex tterm1)
+				(ttmrg->elsex tterm2))))
+	(:fncall (and (ttmrg->f-equiv tterm1 tterm2)
+		      (top-down-args-inv (ttmrg->args tterm1)
+					 (ttmrg->args tterm2)))))))
+  ///
+  (verify-guards top-down-inv)
+  (fty::deffixequiv-mutual top-down-inv)
+
+  (local (defthm-top-down-inv-flag
+           (defthm top-down-args-inv-expr-path-equivs
+	     (implies (top-down-args-inv args1 args2)
+		      (and
+		        (ttmrg-list->expr-list-equiv args1 args2)
+		        (ttmrg-list->path-cond-equiv args1 args2)))
+	     :flag top-down-args-inv
+	     :rule-classes :forward-chaining)
+           (defthm top-down-inv-expr-path-equivs
+	     (implies (top-down-inv tterm1 tterm2)
+		      (and
+		        (ttmrg->expr-equiv tterm1 tterm2)
+		        (ttmrg->path-cond-equiv tterm1 tterm2)))
+	     :flag top-down-inv
+	     :rule-classes :forward-chaining)
+           :hints (("Goal"
+	             :expand ((top-down-inv tterm1 tterm2)
+		              (top-down-args-inv args1 args2))
+	             :in-theory (enable ttmrg->path-cond-equiv
+			                ttmrg->path-cond
+			                ttmrg->expr-equiv
+			                ttmrg->expr)))))
+
+  (local (acl2::defruled top-down-inv-fncall-expr-equiv
+    (implies (and (top-down-args-inv (ttmrg->args tterm1)
+				     (ttmrg->args tterm2))
+		  (ttmrg->kind-equiv tterm1 tterm2)
+		  (equal (ttmrg->kind tterm1) :fncall)
+		  (ttmrg->f-equiv tterm1 tterm2))
+	     (ttmrg->expr-equiv tterm1 tterm2))
+    :in-theory (enable ttmrg->expr-equiv
+		       ttmrg->expr)
+    :rule-classes :forward-chaining))
+
+  (local (acl2::defruled top-down-inv-if-expr-equiv
+    (implies (and (top-down-inv (ttmrg->condx tterm1)
+				(ttmrg->condx tterm2))
+		  (top-down-inv (ttmrg->thenx tterm1)
+				(ttmrg->thenx tterm2))
+		  (top-down-inv (ttmrg->elsex tterm1)
+				(ttmrg->elsex tterm2))
+		  (ttmrg->kind-equiv tterm1 tterm2)
+		  (equal (ttmrg->kind tterm1) :if))
+	     (ttmrg->expr-equiv tterm1 tterm2))
+    :in-theory (enable ttmrg->expr-equiv
+		       ttmrg->expr)
+    :rule-classes :forward-chaining))
+
+  (local (acl2::defruled top-down-inv-var-expr-equiv
+    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
+		  (equal (ttmrg->kind tterm1) :var)
+		  (ttmrg->name-equiv tterm1 tterm2))
+	     (ttmrg->expr-equiv tterm1 tterm2))
+    :in-theory (enable ttmrg->expr-equiv
+		       ttmrg->expr)
+    :rule-classes :forward-chaining))
+
+  (local (acl2::defruled top-down-inv-quote-expr-equiv
+    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
+		  (equal (ttmrg->kind tterm1) :quote)
+		  (ttmrg->val-equiv tterm1 tterm2))
+	     (ttmrg->expr-equiv tterm1 tterm2))
+    :in-theory (enable ttmrg->expr-equiv
+		       ttmrg->expr)
+    :rule-classes :forward-chaining))
+
+  (local (acl2::defruled top-down-inv-smt-judgements-ev
+    (implies (and (ttmrg->judgements-ev tterm1 a)
+		  (set::subset (ttmrg->smt-judgements tterm2)
+			       (ttmrg->judgements tterm1))
+		  (ttmrg->expr-equiv tterm1 tterm2))
+	     (ttmrg->smt-judgements-ev tterm2 a))
+    :in-theory (e/d (ttmrg->judgements-ev
+		     ttmrg->smt-judgements-ev
+		     all-subset<judge-ev>)
+		    (all-strategy<judge-ev>))))
+
+  (local (acl2::defruled top-down-inv-fncall-inductive-case
+    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
+		  (ttmrg->path-cond-equiv tterm1 tterm2)
+		  (ttmrg->judgements-equiv tterm1 tterm2)
+		  (set::subset (ttmrg->smt-judgements tterm2)
+			       (ttmrg->judgements tterm1))
+		  (equal (ttmrg->kind tterm1) :fncall)
+		  (ttmrg->f-equiv tterm1 tterm2)
+		  (ttmrg-list-correct-p (ttmrg->args tterm2)
+					a)
+		  (ttmrg-correct-p tterm1 a)
+		  (top-down-args-inv (ttmrg->args tterm1)
+				     (ttmrg->args tterm2)))
+	     (ttmrg-correct-p tterm2 a))
+    :expand ((ttmrg-correct-p tterm1 a)
+	     (ttmrg-correct-p tterm2 a))
+    :in-theory (e/d (top-down-inv-fncall-expr-equiv
+		     top-down-inv-smt-judgements-ev)
+		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+
+  (local (acl2::defruled top-down-inv-if-inductive-case
+    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
+		  (ttmrg->judgements-equiv tterm1 tterm2)
+		  (set::subset (ttmrg->smt-judgements tterm2)
+			       (ttmrg->judgements tterm1))
+		  (equal (ttmrg->kind tterm1) :if)
+		  (top-down-inv (ttmrg->condx tterm1)
+				(ttmrg->condx tterm2))
+		  (top-down-inv (ttmrg->thenx tterm1)
+				(ttmrg->thenx tterm2))
+		  (ttmrg-correct-p (ttmrg->condx tterm2)
+				   a)
+		  (ttmrg-correct-p (ttmrg->thenx tterm2)
+				   a)
+		  (ttmrg-correct-p (ttmrg->elsex tterm2)
+				   a)
+		  (ttmrg-correct-p tterm1 a)
+		  (ttmrg->path-cond-equiv tterm1 tterm2)
+		  (top-down-inv (ttmrg->elsex tterm1)
+				(ttmrg->elsex tterm2)))
+	     (ttmrg-correct-p tterm2 a))
+    :expand ((ttmrg-correct-p tterm1 a)
+	     (ttmrg-correct-p tterm2 a))
+    :in-theory (e/d (top-down-inv-if-expr-equiv
+		     top-down-inv-smt-judgements-ev)
+		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+
+  (local (acl2::defruled top-down-inv-var-case
+    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
+		  (ttmrg->judgements-equiv tterm1 tterm2)
+		  (set::subset (ttmrg->smt-judgements tterm2)
+			       (ttmrg->judgements tterm1))
+		  (equal (ttmrg->kind tterm1) :var)
+		  (ttmrg-correct-p tterm1 a)
+		  (ttmrg->path-cond-equiv tterm1 tterm2)
+		  (ttmrg->name-equiv tterm1 tterm2))
+	     (ttmrg-correct-p tterm2 a))
+    :expand ((ttmrg-correct-p tterm1 a)
+	     (ttmrg-correct-p tterm2 a))
+    :in-theory (e/d (top-down-inv-var-expr-equiv
+		     top-down-inv-smt-judgements-ev)
+		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+
+  (local (acl2::defruled top-down-inv-quote-case
+    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
+		  (ttmrg->judgements-equiv tterm1 tterm2)
+		  (set::subset (ttmrg->smt-judgements tterm2)
+			       (ttmrg->judgements tterm1))
+		  (equal (ttmrg->kind tterm1) :quote)
+		  (ttmrg-correct-p tterm1 a)
+		  (ttmrg->path-cond-equiv tterm1 tterm2)
+		  (ttmrg->val-equiv tterm1 tterm2))
+	     (ttmrg-correct-p tterm2 a))
+    :expand ((ttmrg-correct-p tterm1 a)
+	     (ttmrg-correct-p tterm2 a))
+    :in-theory (e/d (top-down-inv-quote-expr-equiv
+		     top-down-inv-smt-judgements-ev)
+		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+
+  (defthm-top-down-inv-flag
+    (defthm top-down-args-inv-preserves-ttmrg-correct-p
+      (implies (and (ttmrg-list-correct-p args1 a)
+		    (top-down-args-inv args1 args2))
+	       (ttmrg-list-correct-p args2 a))
+      :flag top-down-args-inv)
+    (defthm top-down-inv-preserves-ttmrg-correct-p
+      (implies (and (ttmrg-correct-p tterm1 a)
+		    (top-down-inv tterm1 tterm2))
+	       (ttmrg-correct-p tterm2 a))
+      :flag top-down-inv)
+    :hints (("Goal"
+	      :in-theory (enable top-down-inv-fncall-inductive-case
+			         top-down-inv-if-inductive-case
+			         top-down-inv-var-case
+			         top-down-inv-quote-case)
+	      :expand ((top-down-inv tterm1 tterm2)
+		       (top-down-args-inv args1 args2))))))
+
+
+(defines top-down-precond-p
+  :verify-guards nil
+  :well-founded-relation l<
+
+  (define top-down-args-precond-p ((args ttmrg-list-p))
+    :measure (list (ttmrg-list->expr-list-count args) 1 0)
+    :returns (ok booleanp)
+    (b* ((args (ttmrg-list-fix args))
+	 ((if (endp args)) t)
+	 ((if (consp args))
+	  (and (top-down-precond-p (car args))
+	       (top-down-args-precond-p (cdr args)))))
+      nil))
+
+  (define top-down-precond-p ((tterm ttmrg-p))
+    :measure (list (ttmrg->expr-count tterm) 2 0)
+    :returns (ok booleanp)
+    (b* ((tterm (ttmrg-fix tterm))
+	 ((unless (set::empty (ttmrg->smt-judgements tterm)))
+          nil))
+      (case (ttmrg->kind tterm)
+	(:quote t)
+	(:var t)
+	(:if (and (top-down-precond-p (ttmrg->condx tterm))
+		  (top-down-precond-p (ttmrg->thenx tterm))
+		  (top-down-precond-p (ttmrg->elsex tterm))))
+	(:fncall (top-down-args-precond-p (ttmrg->args tterm))))))
+  ///
+  (verify-guards top-down-precond-p)
+  (fty::deffixequiv-mutual top-down-precond-p))
+
+
 (define refine-judgement-helper ((recognizers pseudo-term-listp)
                                  (judgements judge-set-p))
   :measure (acl2-count recognizers)
@@ -75,6 +341,50 @@
 		     (set::subset rv top))))))
 
 
+(define refine-terminal ((tterm ttmrg-p)
+                         (top judge-set-p))
+  :guard (or (equal (ttmrg->kind tterm) :quote)
+             (equal (ttmrg->kind tterm) :var))
+  :returns (rv ttmrg-p)
+  (b* ((tterm (ttmrg-fix tterm))
+       (top (judge-set-fix top))
+       ((unless (mbt (or (equal (ttmrg->kind tterm) :quote)
+                         (equal (ttmrg->kind tterm) :var))))
+        (make-ttmrg-trivial nil))
+       (judgements (ttmrg->judgements tterm))
+       (new-judgement (refine-judgement judgements top)))
+    (ttmrg-add-smt-judge-set tterm new-judgement))
+  ///
+  (fty::deffixequiv refine-terminal)
+  (more-returns
+  ;;  (rv :name refine-terminal-preserves-ttmrg-correct-p
+  ;;      (implies (and (ttmrg-correct-p tterm a)
+  ;;       	     (or (equal (ttmrg->kind tterm) :quote)
+  ;;       		 (equal (ttmrg->kind tterm) :var)))
+  ;;       	(ttmrg-correct-p rv a))
+  ;;      :hints (("Goal"
+  ;;                :in-theory (disable refine-judgement-of-judge-set-fix-top
+  ;;       		             refine-judgement-judge-set-equiv-congruence-on-top))))
+   (rv :name refine-terminal-implements-top-down-inv
+       (implies (and (top-down-precond-p tterm)
+                  (not (equal rv
+                              (make-ttmrg-trivial nil))))
+             (top-down-inv tterm
+                           (refine-terminal tterm top)))
+       :hints (("Goal"
+                 :in-theory (e/d (top-down-inv)
+                                 (refine-judgement-of-judge-set-fix-top
+			          refine-judgement-judge-set-equiv-congruence-on-top))
+                 :expand ((top-down-precond-p tterm)
+                          (refine-terminal tterm top)
+                          (top-down-inv
+                            tterm
+                            (ttmrg-add-smt-judge-set
+                              tterm
+                              (refine-judgement (ttmrg->judgements tterm)
+                                                (judge-set-fix top))))))))))
+
+
 (define parse-judge-sets-correct-p ((judge-sets judge-set-list-p)
                                     (terms pseudo-term-listp)
                                     (judge-pts pseudo-term-listp)
@@ -111,6 +421,7 @@
     (cons (parse-judge-set (car terms) (car judge-pts))
           (parse-judge-sets (cdr terms) (cdr judge-pts))))
   ///
+  (fty::deffixequiv parse-judge-sets)
   (more-returns
    (rv :name parse-judge-sets-correct
        (parse-judge-sets-correct-p rv terms judge-pts a)
@@ -119,28 +430,26 @@
                  :induct (parse-judge-sets terms judge-pts))))))
 
 
-(define refine-terminal ((tterm ttmrg-p)
-                         (top judge-set-p))
-  :guard (or (equal (ttmrg->kind tterm) :quote)
-             (equal (ttmrg->kind tterm) :var))
-  :returns (rv ttmrg-p)
-  (b* ((tterm (ttmrg-fix tterm))
-       (top (judge-set-fix top))
-       ((unless (mbt (or (equal (ttmrg->kind tterm) :quote)
-                         (equal (ttmrg->kind tterm) :var))))
-        (make-ttmrg-trivial nil))
-       (judgements (ttmrg->judgements tterm))
-       (new-judgement (refine-judgement judgements top)))
-    (ttmrg-add-smt-judge-set tterm new-judgement))
-  ///
-  (fty::deffixequiv refine-terminal)
-  (more-returns
-   (rv :name refine-terminal-preserves-ttmrg-correct-p
-       (implies (and (ttmrg-correct-p tterm a)
-		     (judge-set-p top)
-		     (or (equal (ttmrg->kind tterm) :quote)
-			 (equal (ttmrg->kind tterm) :var)))
-		(ttmrg-correct-p rv a)))))
+(acl2::defruled osets-list-set-equivalents
+  (implies (judge-set-p j-set)
+	   (and
+	     (equal (car j-set)
+		    (set::head j-set))
+	     (equal (cdr j-set)
+		    (set::tail j-set))))
+  :in-theory (enable set::head
+		     set::tail))
+
+
+(acl2::defruled and-list-judge-ev-lst-equals-all-judge-ev
+  (implies (and (judge-set-p j-set)
+                (pseudo-termp tterm))
+	   (equal (and-list (judge-ev-lst j-set tterm a))
+                  (all<judge-ev> j-set tterm a)))
+  :in-theory (enable set::empty
+		     set::cardinality
+		     osets-list-set-equivalents)
+  :induct (set::cardinality j-set))
 
 
 (define ttmrg-smt-judgement-expr ((tterm ttmrg-p))
@@ -148,13 +457,24 @@
   (b* ((tterm (ttmrg-fix tterm)))
     (and-list-expr
       (judge-list-flat-expr (ttmrg->smt-judgements tterm)
-                            (ttmrg->expr tterm)))))
+                            (ttmrg->expr tterm))))
+  ///
+  (fty::deffixequiv ttmrg-smt-judgement-expr)
+  (more-returns
+   (rv :name ttmrg-smt-judgement-expr-correct
+       (equal (ev-smtcp rv a)
+	      (ttmrg->smt-judgements-ev tterm a))
+       :hints (("Goal"
+                 :in-theory (e/d (and-list-judge-ev-lst-equals-all-judge-ev)
+			         (and-list--expr/ev))
+	         :expand ((ttmrg-smt-judgement-expr tterm)
+		          (ttmrg->smt-judgements-ev tterm a)))))))
 
 
 (defines refine-ttmrg
-  :ignore-ok t
   :verify-guards nil
   :well-founded-relation l<
+  :flag-local nil
 
   (define refine-if ((tterm ttmrg-p)
                      (top judge-set-p)
@@ -166,13 +486,13 @@
     :returns (rv ttmrg-p)
     (b* ((tterm (ttmrg-fix tterm))
          (top (judge-set-fix top))
+         (options (type-options-fix options))
          ((unless (mbt (equal (ttmrg->kind tterm) :if)))
           (make-ttmrg-trivial nil))
          (judgements (ttmrg->judgements tterm))
          (permissible (refine-judgement judgements top))
-         (bool (set::insert (judge-fix '(booleanp smt::x)) '()))
          (new-condx (refine-ttmrg (ttmrg->condx tterm)
-                                  bool
+                                  *bool-judgement*
                                   options
                                   state))
          (new-thenx (refine-ttmrg (ttmrg->thenx tterm)
@@ -183,6 +503,13 @@
                                   permissible
                                   options
                                   state))
+         ((if (or (equal new-condx
+                         (make-ttmrg-trivial nil))
+                  (equal new-thenx
+                         (make-ttmrg-trivial nil))
+                  (equal new-elsex
+                         (make-ttmrg-trivial nil))))
+          (make-ttmrg-trivial nil))
          (new-guts (make-ttmrg-guts-if :condx new-condx
                                        :thenx new-thenx
                                        :elsex new-elsex)))
@@ -194,13 +521,24 @@
                       (options type-options-p)
                       state)
     :measure (list (ttmrg-list->expr-list-count tterms) 1 0)
-    :returns (rv ttmrg-list-p)
+    :returns (mv (err booleanp)
+                 (val ttmrg-list-p))
     (b* ((tterms (ttmrg-list-fix tterms))
          (tops (judge-set-list-fix tops))
-         ((unless (consp tterms)) nil)
-         ((unless (consp tops)) nil))
-      (cons (refine-ttmrg (car tterms) (car tops) options state)
-            (zip-refine (cdr tterms) (cdr tops) options state))))
+         (options (type-options-fix options))
+         ((unless (top-down-args-precond-p tterms))
+          (mv t nil))
+         ((unless (and (consp tterms)
+                       (consp tops)))
+          (mv nil nil))
+         (new-head (refine-ttmrg (car tterms) (car tops) options state))
+         ((if (equal new-head
+                     (make-ttmrg-trivial nil)))
+          (mv t nil))
+         ((mv err new-tail)
+          (zip-refine (cdr tterms) (cdr tops) options state))
+         ((if err) (mv t nil)))
+      (mv nil (cons new-head new-tail))))
 
   (define refine-fn ((tterm ttmrg-p)
                      (top judge-set-p)
@@ -212,7 +550,10 @@
     :returns (rv ttmrg-p)
     (b* ((tterm (ttmrg-fix tterm))
          (top (judge-set-fix top))
+         (options (type-options-fix options))
          ((unless (mbt (equal (ttmrg->kind tterm) :fncall)))
+          (make-ttmrg-trivial nil))
+         ((unless (top-down-args-precond-p (ttmrg->args tterm)))
           (make-ttmrg-trivial nil))
          (judgements (ttmrg->judgements tterm))
          (permissible (refine-judgement judgements top))
@@ -236,9 +577,14 @@
                                            (cdr conspair)
                                            options
                                            state))
-         (permissible-judge-sets (parse-judge-sets args-expr                                                   permissible-args))
-         (new-args (zip-refine args permissible-judge-sets options
-                               state))
+         (permissible-judge-sets (parse-judge-sets args-expr
+                                                   permissible-args))
+         ;; TODO show that the downstream functions actually preserve list length?
+         ((unless (= (len (ttmrg->args tterm))
+                     (len permissible-judge-sets)))
+          (make-ttmrg-trivial nil))
+         ((mv err new-args) (zip-refine args permissible-judge-sets options state))
+         ((if err) (make-ttmrg-trivial nil))
          (new-guts (make-ttmrg-guts-fncall :f f :args new-args)))
       (ttmrg-add-smt-judge-set (ttmrg-change-guts tterm new-guts)
                                permissible)))
@@ -249,17 +595,176 @@
                         state)
     :measure (list (ttmrg->expr-count tterm) 3 0)
     :returns (rv ttmrg-p)
-    (b* (((unless (mbt (ttmrg-p tterm)))
-          (make-ttmrg-trivial nil))
-         (tterm (ttmrg-fix tterm))
-         (top (judge-set-fix top)))
+    (b* ((tterm (ttmrg-fix tterm))
+         (top (judge-set-fix top))
+         (options (type-options-fix options))
+         ((unless (top-down-precond-p tterm))
+          (make-ttmrg-trivial nil)))
       (case (ttmrg->kind tterm)
         (:quote (refine-terminal tterm top))
         (:var (refine-terminal tterm top))
         (:if (refine-if tterm top options state))
         (:fncall (refine-fn tterm top options state)))))
   ///
-  (verify-guards refine-ttmrg))
+  (verify-guards refine-ttmrg)
+  (fty::deffixequiv-mutual refine-ttmrg)
+
+  (local (acl2::defruled refine-ttmrg-fncall-inductive-case
+           (implies
+             (and
+               (equal (ttmrg->kind tterm) :fncall)
+               (assoc-equal (ttmrg->f tterm)
+                            (type-options->functions options))
+               (top-down-args-inv
+                 (ttmrg->args tterm)
+                 new-args)
+               (top-down-precond-p tterm)
+               (judge-set-p top))
+             (top-down-inv
+               tterm
+               (ttmrg-add-smt-judge-set
+                 (ttmrg-change-guts
+                   tterm
+                   (ttmrg-guts-fncall
+                     (ttmrg->f tterm)
+                     new-args))
+                 (refine-judgement (ttmrg->judgements tterm)
+                                   top))))
+           :in-theory (enable ttmrg-change-guts
+                              ttmrg-add-smt-judge-set)
+           :expand ((top-down-precond-p tterm)
+                    (top-down-inv tterm
+                                  (ttmrg (ttmrg->path-cond tterm)
+                                         (ttmrg->judgements tterm)
+                                         (refine-judgement (ttmrg->judgements tterm)
+                                                           top)
+                                         (ttmrg-guts-fncall (ttmrg->f tterm)
+                                                            new-args))))))
+
+  (local (acl2::defruled refine-ttmrg-if-inductive-case
+           (implies
+             (and (equal (ttmrg->kind tterm) :if)
+                  (top-down-inv (ttmrg->condx tterm)
+                                new-condx)
+                  (top-down-inv (ttmrg->thenx tterm)
+                                new-thenx)
+                  (top-down-inv (ttmrg->elsex tterm)
+                                new-elsex)
+                  (top-down-precond-p tterm)
+                  (judge-set-p top))
+             (top-down-inv
+               tterm
+               (ttmrg-add-smt-judge-set
+                 (ttmrg-change-guts
+                   tterm
+                   (ttmrg-guts-if new-condx
+                                  new-thenx
+                                  new-elsex))
+                 (refine-judgement (ttmrg->judgements tterm)
+                                   top))))
+           :in-theory (enable ttmrg-change-guts
+                              ttmrg-add-smt-judge-set)
+           :expand ((top-down-precond-p tterm)
+                    (top-down-inv tterm
+                                  (ttmrg (ttmrg->path-cond tterm)
+                                         (ttmrg->judgements tterm)
+                                         (refine-judgement (ttmrg->judgements tterm)
+                                                           top)
+                                         (ttmrg-guts-if new-condx new-thenx
+                                                        new-elsex))))))
+
+  (local (acl2::defruled refine-ttmrg-zip-inductive-case
+           (implies (and (consp tterms)
+                         (consp tops)
+                         (not (equal new-head
+                                     (make-ttmrg-trivial nil)))
+                         (top-down-inv (car tterms)
+                                       new-head)
+                         (top-down-args-inv (cdr tterms)
+                                            new-tail)
+                         (ttmrg-list-p tterms)
+                         (top-down-args-precond-p tterms)
+                         (judge-set-list-p tops))
+                    (top-down-args-inv tterms
+                                       (cons new-head new-tail)))
+           :in-theory (enable top-down-args-inv)))
+
+  (local (acl2::defruled refine-ttmrg-zip-degenerate-case-0
+           (implies (consp tterms)
+                    (not (equal (len tterms) 0)))))
+
+  (defthm-refine-ttmrg-flag
+    (defthm refine-if-implements-top-down-inv
+      (implies (and (state-p state)
+                    (ttmrg-p tterm)
+                    (top-down-precond-p tterm)
+                    (judge-set-p top)
+                    (type-options-p options)
+                    (equal (ttmrg->kind tterm) :if)
+                    (not (equal (refine-if tterm top options state)
+                                (make-ttmrg-trivial nil))))
+	       (top-down-inv tterm (refine-if tterm top options state)))
+      :flag refine-if
+      :skip t
+      :hints ('(:expand ((refine-if tterm top options state)))))
+
+    (defthm zip-refine-implements-top-down-args-inv
+      (mv-let (err rv) (zip-refine tterms tops options state)
+        (implies (and (state-p state)
+                      (ttmrg-list-p tterms)
+                      (judge-set-list-p tops)
+                      (type-options-p options)
+                      (= (len tterms)
+                         (len tops))
+                      (not err))
+	         (top-down-args-inv tterms rv)))
+      :flag zip-refine
+      :skip t
+      :hints ('(:expand ((zip-refine tterms tops options state)
+                         (top-down-args-inv tterms nil)))))
+
+    (defthm refine-fn-implements-top-down-inv
+      (implies (and (state-p state)
+                    (ttmrg-p tterm)
+                    (top-down-precond-p tterm)
+                    (judge-set-p top)
+                    (type-options-p options)
+                    (equal (ttmrg->kind tterm) :fncall)
+                    (not (equal (refine-fn tterm top options state)
+			        (make-ttmrg-trivial nil))))
+	       (top-down-inv tterm (refine-fn tterm top options state)))
+      :skip t
+      :flag refine-fn
+      :hints ('(:expand ((refine-fn tterm top options state)))))
+
+    (defthm refine-ttmrg-implements-top-down-inv
+      (implies (and (state-p state)
+                    (ttmrg-p tterm)
+                    (judge-set-p top)
+                    (type-options-p options)
+	            (not (equal (refine-ttmrg tterm top options state)
+			        (make-ttmrg-trivial nil))))
+		    (top-down-inv tterm (refine-ttmrg tterm top options state)))
+      :flag refine-ttmrg
+      :hints ('(:expand ((refine-ttmrg tterm top options state)))))
+    :hints (("Goal"
+	      :in-theory (e/d (refine-ttmrg-fncall-inductive-case
+                               refine-ttmrg-if-inductive-case
+                               refine-ttmrg-zip-inductive-case
+                               refine-ttmrg-zip-degenerate-case-0)
+                              ((:executable-counterpart
+                                make-ttmrg-trivial)))))))
+
+
+(defrule refine-ttmrg-preserves-ttmrg-correct-p
+  (implies (and (state-p state)
+                (ttmrg-p tterm)
+                (judge-set-p top)
+                (type-options-p options)
+	        (not (equal (refine-ttmrg tterm top options state)
+			    (make-ttmrg-trivial nil)))
+                (ttmrg-correct-p tterm a))
+           (ttmrg-correct-p (refine-ttmrg tterm top options state) a)))
 
 
 (define type-judge-topdown-cp ((cl pseudo-term-listp)
@@ -273,8 +778,7 @@
        ((if fail) (value (list nil)))
        (next-cp (cdr (assoc-equal 'type-judge-topdown *SMT-architecture*)))
        ((if (null next-cp)) (value (list nil)))
-       (bool (set::insert (judge-fix '(booleanp smt::x)) '()))
-       (new-tt (refine-ttmrg tterm bool type-opt state))
+       (new-tt (refine-ttmrg tterm *bool-judgement* type-opt state))
        (the-hint
          `(:clause-processor (,next-cp clause ',smtlink-hint state)))
        (new-cl (ttmrg-clause new-tt))
