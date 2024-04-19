@@ -30,7 +30,8 @@
                           (rationalp x)
                           (symbolp x)
                           (booleanp x)
-                          (type-hyp xlist tag))
+                          (type-hyp xlist tag)
+                          (acl2::any-p$inline x))
                          :namedp t)
 
 (acl2::def-ev-theoremp ev-smtcp)
