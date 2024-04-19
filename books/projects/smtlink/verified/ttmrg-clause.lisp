@@ -41,7 +41,7 @@
   :returns (cl pseudo-termp :hints(("Goal" :in-theory (enable pseudo-termp))))
   (b* ((tterm (ttmrg-fix tterm)))
     `(implies
-       (if (ttmrg-p (quote ,tterm))
+       (if (acl2::any-p$inline (quote ,tterm))
            ,(ttmrg-correct-expr tterm)
          ''nil)
        ,(ttmrg->expr tterm)))
@@ -74,7 +74,7 @@
   :returns (mv (fail booleanp) (tterm ttmrg-p))
   (b* (((unless (pseudo-termp cl)) (mv t (make-ttmrg)))
        (tterm (case-match cl
-		      (('implies ('if ('ttmrg-p ('quote tterm)) & &) &) tterm)
+		      (('implies ('if ('acl2::any-p$inline ('quote tterm)) & &) &) tterm)
 		      (& nil)))
        ((unless (and (ttmrg-p tterm)
 		     (equal (ttmrg-clause tterm) cl)))
@@ -90,6 +90,13 @@
                     (equal parsed-tterm tterm))))
     :expand ((ttmrg-clause tterm))
     :in-theory (enable pseudo-termp))
+  (defrule ttmrg-clause-of-ttmrg-parse-clause
+    (mv-let (fail parsed-tterm)
+            (ttmrg-parse-clause cl)
+      (implies (not fail)
+               (equal (ttmrg-clause parsed-tterm)
+                      cl)))
+    :expand ((ttmrg-parse-clause cl)))
   (defrule ttmrg-parse-clause-pass
     (mv-let
         (fail tterm)
