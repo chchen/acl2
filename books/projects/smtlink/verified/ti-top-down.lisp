@@ -25,8 +25,18 @@
 (include-book "ti-bottom-up3")
 
 (set-state-ok t)
-(set-bogus-mutual-recursion-ok t)
 (set-induction-depth-limit 1)
+(make-event
+ (pprogn (set-warnings-as-errors t '("Use") state)
+         (value '(value-triple nil))))
+
+(local (in-theory (e/d
+  (ev-smtcp-of-fncall-args)
+  (pseudo-termp pseudo-term-listp symbol-listp  ; Mark is impatient
+   boolean-listp member-equal consp-of-pseudo-lambdap
+   pseudo-lambdap-of-fn-call-of-pseudo-termp lambda-of-pseudo-lambdap
+   default-car
+   (:type-prescription pseudo-lambdap)))))
 
 
 (defval *top-down-priority*
@@ -747,67 +757,99 @@
       :hints ('(:expand ((refine-ttmrg tterm top options state)))))
 
     :hints (("Goal"
-	      :in-theory (disable (:executable-counterpart make-ttmrg-trivial))))))
+	      :in-theory (disable (:executable-counterpart
+	                           make-ttmrg-trivial)))))
+
+  (defrule refine-ttmrg-satisfies-clause-processor-relations
+    (let ((rv (refine-ttmrg tterm top options state)))
+      (implies (top-down-postcond-p tterm rv)
+               (and
+                 (equal (ev-smtcp (ttmrg->expr rv)
+                                  a)
+                        (ev-smtcp (ttmrg->expr tterm)
+                                  a))
+                 (implies
+                   (ttmrg-correct-p tterm a)
+                   (ttmrg-correct-p rv a)))))))
 
 
-(define type-judge-topdown-cp ((cl pseudo-term-listp)
-                               (smtlink-hint t)
-                               state)
-  (b* (((unless (pseudo-term-listp cl)) (value (list nil)))
-       ((unless (smtlink-hint-p smtlink-hint)) (value (list nil)))
+(define refine-ttmrg-wrapper ((tterm ttmrg-p)
+                              (options type-options-p)
+                              state)
+  :returns (new-tt ttmrg-p)
+  (refine-ttmrg tterm *bool-judgement* options state)
+  ///
+  (defthmd refine-ttmrg-wrapper-implements-top-down-postcond-p
+    (b* ((new-tt (refine-ttmrg-wrapper tterm options state)))
+      (implies (not (equal new-tt
+                           (make-ttmrg-trivial nil)))
+               (top-down-postcond-p tterm new-tt))))
+
+  (defthmd refine-ttmrg-wrapper-satisfies-clause-processor-relations-hypo
+    (b* ((new-tt (refine-ttmrg-wrapper tterm options state)))
+      (implies (top-down-postcond-p tterm new-tt)
+               (and
+                 (equal (ev-smtcp (ttmrg->expr new-tt)
+                                  a)
+                        (ev-smtcp (ttmrg->expr tterm)
+                                  a))
+                 (implies
+                   (ttmrg-correct-p tterm a)
+                   (ttmrg-correct-p new-tt a))))))
+
+  (defrule refine-ttmrg-wrapper-satisfies-clause-processor-relations
+    (let ((new-tt (refine-ttmrg-wrapper tterm options state)))
+      (and
+        (implies (ev-smtcp (ttmrg->expr new-tt) a)
+                 (ev-smtcp (ttmrg->expr tterm) a))
+        (implies (ttmrg-correct-p tterm a)
+                 (ttmrg-correct-p new-tt a))))
+    :in-theory (e/d (refine-ttmrg-wrapper-implements-top-down-postcond-p
+                     refine-ttmrg-wrapper-satisfies-clause-processor-relations-hypo)
+                    ((:executable-counterpart make-ttmrg-trivial)))
+    :cases ((equal (refine-ttmrg-wrapper tterm options state)
+                   (make-ttmrg-trivial nil)))))
+
+
+(define type-judge-top-down-cp ((cl pseudo-term-listp)
+                                (hint t)
+                                state)
+  (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
+       ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((type-options type-opt) (construct-type-options smtlink-hint goal))
+       (type-opt (construct-type-options hint goal))
        ((mv fail tterm) (ttmrg-parse-clause goal))
-       ((if fail) (value (list nil)))
+       ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal 'type-judge-topdown *SMT-architecture*)))
-       ((if (null next-cp)) (value (list nil)))
-       (new-tt (refine-ttmrg tterm *bool-judgement* type-opt state))
+       ((if (null next-cp)) (mv t nil state))
+       (new-tt (refine-ttmrg-wrapper tterm type-opt state))
+       ((if (equal new-tt
+                   (make-ttmrg-trivial nil)))
+        (mv t nil state))
        (the-hint
-         `(:clause-processor (,next-cp clause ',smtlink-hint state)))
+         `(:clause-processor (,next-cp clause ',hint state)))
        (new-cl (ttmrg-clause new-tt))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 
 
-(defrule top-down-postcond-p-implies-ttmrg-clause-evaluation
-  (implies (and (top-down-postcond-p input output))
-           (implies (ev-smtcp (ttmrg-clause output) a)
-                    (ev-smtcp (ttmrg-clause input) a)))
-  :in-theory (e/d (ttmrg-clause)
-                  (top-down-postcond-p-expr-path-equivs
-                   top-down-postcond-p-impl-ttmrg-correct-p))
-  :use ((:instance top-down-postcond-p-expr-path-equivs
-                   (tterm1 input)
-                   (tterm2 output))
-        (:instance top-down-postcond-p-impl-ttmrg-correct-p
-                   (tterm1 input)
-                   (tterm2 output))))
-
-
-(defrule correctness-of-type-judge-topdown-cp
+(defrule correctness-of-type-judge-top-down-cp
   (implies (and (ev-smtcp-meta-extract-global-facts)
                 (pseudo-term-listp cl)
                 (alistp a)
                 (ev-smtcp
-                 (conjoin-clauses
-                  (acl2::clauses-result
-                   (type-judge-topdown-cp cl hints state)))
-                 a))
+                  (conjoin-clauses
+                    (acl2::clauses-result
+                      (type-judge-top-down-cp cl hint state)))
+                  a))
            (ev-smtcp (disjoin cl) a))
   :do-not-induct t
-  :expand (type-judge-topdown-cp cl hints state)
-  :in-theory (e/d ()
-                  (ev-smtcp-of-disjoin
-                   refine-ttmrg-implements-top-down-postcond-p
-                   top-down-postcond-p-implies-ttmrg-clause-evaluation))
-  :use ((:instance refine-ttmrg-implements-top-down-postcond-p
-                   (tterm (mv-nth 1 (ttmrg-parse-clause (disjoin cl))))
-                   (top '((booleanp x)))
-                   (options (construct-type-options hints (disjoin cl))))
-        (:instance top-down-postcond-p-implies-ttmrg-clause-evaluation
-                   (input (mv-nth 1 (ttmrg-parse-clause (disjoin cl))))
-                   (output (refine-ttmrg (mv-nth 1 (ttmrg-parse-clause (disjoin cl)))
-                                         '((booleanp x))
-                                         (construct-type-options hints (disjoin cl))
-                                         state))))
+  :expand ((type-judge-top-down-cp cl hint state))
+  :use ((:functional-instance
+          correctness-of-tterm-trans-fn-cp
+          (tterm-trans-fn refine-ttmrg-wrapper)
+          (env-trans-fn (lambda (x) x))
+          (current-cp-fn (lambda () 'type-judge-topdown))
+          (tterm-trans-fn-cp type-judge-top-down-cp)))
+  :in-theory (disable ev-smtcp-of-disjoin)
   :rule-classes :clause-processor)
