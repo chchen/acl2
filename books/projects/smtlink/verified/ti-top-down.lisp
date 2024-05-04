@@ -18,7 +18,7 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "ttmrg-change3")
-(include-book "ttmrg-clause")
+(include-book "ttmrg-clause-cp")
 (include-book "typed-term-fns")
 (include-book "returns-judgement")
 (include-book "judgement-fns")
@@ -817,15 +817,13 @@
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       (type-opt (construct-type-options hint goal))
+       ((unless (pseudo-term-syntax-p goal)) (mv t nil state))
        ((mv fail tterm) (ttmrg-parse-clause goal))
        ((if fail) (mv t nil state))
-       (next-cp (cdr (assoc-equal 'type-judge-topdown *SMT-architecture*)))
+       (next-cp (cdr (assoc-equal 'type-judge-top-down *SMT-architecture*)))
        ((if (null next-cp)) (mv t nil state))
+       (type-opt (construct-type-options hint goal))
        (new-tt (refine-ttmrg-wrapper tterm type-opt state))
-       ((if (equal new-tt
-                   (make-ttmrg-trivial nil)))
-        (mv t nil state))
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
        (new-cl (ttmrg-clause new-tt))
@@ -849,7 +847,7 @@
           correctness-of-tterm-trans-fn-cp
           (tterm-trans-fn refine-ttmrg-wrapper)
           (env-trans-fn (lambda (x) x))
-          (current-cp-fn (lambda () 'type-judge-topdown))
+          (current-cp-fn (lambda () 'type-judge-top-down))
           (tterm-trans-fn-cp type-judge-top-down-cp)))
   :in-theory (disable ev-smtcp-of-disjoin)
   :rule-classes :clause-processor)

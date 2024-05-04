@@ -7,7 +7,7 @@
 
 (in-package "SMT")
 
-(include-book "ttmrg-clause")
+(include-book "ttmrg-clause-cp")
 (include-book "ttmrg-change3")
 (include-book "typed-term-fns")
 (include-book "judgement-fns")
@@ -789,36 +789,43 @@
 (in-theory (disable ttmrg-upcc-ignore-options-and-state))
 
 
-(define type-judge-bottomup-cp ((cl pseudo-term-listp)
-                                (smtlink-hint t)
+(define type-judge-bottom-up-cp ((cl pseudo-term-listp)
+                                (hint t)
                                 state)
-  (b* (((unless (pseudo-term-listp cl)) (value (list nil)))
-       ((unless (smtlink-hint-p smtlink-hint)) (value (list nil)))
+  (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
+       ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((unless (pseudo-term-syntax-p goal)) (value (list nil)))
-       ((type-options h) (construct-type-options smtlink-hint goal))
-       (new-tt (ttmrg-propagate-ti-bottom-up-term
-		(make-ttmrg-trivial goal) h state))
-       (next-cp (cdr (assoc-equal 'type-judge-bottomup *SMT-architecture*)))
-       ((if (null next-cp)) (value (list nil)))
+       ((unless (pseudo-term-syntax-p goal)) (mv t nil state))
+       ((mv fail tterm) (ttmrg-parse-clause goal))
+       ((if fail) (mv t nil state))
+       (next-cp (cdr (assoc-equal 'type-judge-bottom-up *SMT-architecture*)))
+       ((if (null next-cp)) (mv t nil state))
+       (type-opt (construct-type-options hint goal))
+       (new-tt (ttmrg-propagate-ti-bottom-up-term tterm type-opt state))
        (the-hint
-        `(:clause-processor (,next-cp clause ',smtlink-hint state)))
+         `(:clause-processor (,next-cp clause ',hint state)))
        (new-cl (ttmrg-clause new-tt))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 
 
-(defrule correctness-of-type-judge-bottomup-cp
+(defrule correctness-of-type-judge-bottom-up-cp
   (implies (and (ev-smtcp-meta-extract-global-facts)
                 (pseudo-term-listp cl)
                 (alistp a)
                 (ev-smtcp
-                 (conjoin-clauses
-                  (acl2::clauses-result
-                   (type-judge-bottomup-cp cl hints state)))
-                 a))
+                  (conjoin-clauses
+                    (acl2::clauses-result
+                      (type-judge-bottom-up-cp cl hint state)))
+                  a))
            (ev-smtcp (disjoin cl) a))
   :do-not-induct t
-  :expand (type-judge-bottomup-cp cl hints state)
-  :in-theory (enable ttmrg-clause)
+  :expand (type-judge-bottom-up-cp cl hint state)
+  :use ((:functional-instance
+          correctness-of-tterm-trans-fn-cp
+          (tterm-trans-fn ttmrg-propagate-ti-bottom-up-term)
+          (env-trans-fn (lambda (x) x))
+          (current-cp-fn (lambda () 'type-judge-bottom-up))
+          (tterm-trans-fn-cp type-judge-bottom-up-cp)))
+  :in-theory (disable ev-smtcp-of-disjoin)
   :rule-classes :clause-processor)

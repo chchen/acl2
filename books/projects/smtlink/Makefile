@@ -25,6 +25,7 @@ example:
 	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) examples/examples.lisp
 
 ttmrg:
+	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/ttmrg-triv-cp.lisp
 	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/ttmrg-clause.lisp
 	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/ttmrg-change3.lisp
 	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) verified/ti-bottom-up3.lisp
