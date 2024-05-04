@@ -7,10 +7,7 @@
 
 (in-package "SMT")
 
-(include-book "basics")
 (include-book "ttmrg3")
-(include-book "ttmrg-triv3")
-(include-book "type-options")
 
 (set-state-ok t)
 (set-induction-depth-limit 1)
@@ -126,7 +123,7 @@
                         (ev-smtcp (ttmrg-clause tterm) a))))
       :in-theory (enable ttmrg-clause-of-ttmrg-parse-clause)))
 
-  (defrule ev-smtcp-ttmrg-clause
+  (defrule ev-smtcp-of-ttmrg-parse-clause
     (mv-let (fail tterm)
             (ttmrg-parse-clause cl)
       (implies (not fail)
@@ -136,76 +133,3 @@
     :in-theory (e/d (ttmrg-clause
                      ev-smtcp-ttmrg-clause-equivalent)
                     (ttmrg-parse-clause-of-ttmrg-clause))))
-
-
-;; Define correctness properties for ttmrg-clause processors
-(encapsulate
-    (((tterm-trans-fn * * state) => *)
-     ((env-trans-fn *) => *)
-     ((current-cp-fn) => *))
-
-  (local (defun tterm-trans-fn (tterm opts state)
-           (declare (ignore opts state))
-           (ttmrg-fix tterm)))
-
-  (local (defun env-trans-fn (a)
-           a))
-
-  (local (defun current-cp-fn ()
-           'process-hint))
-
-  (defthm symbolp-of-current-cp-fn
-    (symbolp (current-cp-fn)))
-
-  (defthm ttmrg-p-of-tterm-trans-fn
-    (ttmrg-p (tterm-trans-fn tterm opts state)))
-
-  (defthm tterm-trans-fn-preserves-expr-eval-backwards
-    (implies (and (ev-smtcp-meta-extract-global-facts)
-                  (ev-smtcp (ttmrg->expr (tterm-trans-fn tterm opts state))
-                            (env-trans-fn a)))
-             (ev-smtcp (ttmrg->expr tterm) a)))
-
-  (defthm tterm-trans-fn-preserves-correct-p-forwards
-    (implies (and (ev-smtcp-meta-extract-global-facts)
-                  (ttmrg-correct-p tterm a))
-             (ttmrg-correct-p (tterm-trans-fn tterm opts state)
-                              (env-trans-fn a)))))
-
-
-(define tterm-trans-fn-cp ((cl pseudo-term-listp)
-                           (hint t)
-                           state)
-  (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
-       ((unless (smtlink-hint-p hint)) (mv t nil state))
-       (goal (disjoin cl))
-       (type-opts (construct-type-options hint goal))
-       ((mv fail tterm) (ttmrg-parse-clause goal))
-       ((if fail) (mv t nil state))
-       (next-cp (cdr (assoc-equal (current-cp-fn) *SMT-architecture*)))
-       ((if (null next-cp)) (mv t nil state))
-       (new-tt (tterm-trans-fn tterm type-opts state))
-       ((if (equal new-tt
-                   (make-ttmrg-trivial nil)))
-        (mv t nil state))
-       (the-hint
-         `(:clause-processor (,next-cp clause ',hint state)))
-       (new-cl (ttmrg-clause new-tt))
-       (hinted-goal `((hint-please ',the-hint) ,new-cl)))
-    (value (list hinted-goal))))
-
-
-(defrule correctness-of-tterm-trans-fn-cp
-  (implies (and (ev-smtcp-meta-extract-global-facts)
-                (pseudo-term-listp cl)
-                (alistp a)
-                (ev-smtcp
-                  (conjoin-clauses
-                    (acl2::clauses-result
-                      (tterm-trans-fn-cp cl hint state)))
-                  (env-trans-fn a)))
-           (ev-smtcp (disjoin cl) a))
-  :do-not-induct t
-  :expand (tterm-trans-fn-cp cl hint state)
-  :in-theory (disable ev-smtcp-of-disjoin)
-  :rule-classes :clause-processor)

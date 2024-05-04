@@ -177,27 +177,3 @@
       :in-theory (enable pseudo-term-syntax-p pseudo-term-list-syntax-p
 			 make-ttmrg-trivial make-ttmrg-list-trivial
 			 ttmrg->expr ttmrg-list->expr-list)))))
-
-
-(define ttmrg-triv-cp ((cl pseudo-term-listp)
-			(smtlink-hint t)
-			state)
-  (b* (((unless (pseudo-term-listp cl)) (value nil))
-       ((unless (smtlink-hint-p smtlink-hint)) (value (list cl)))
-       (goal (disjoin cl))
-       ((unless (pseudo-term-syntax-p goal)) (value (list cl)))
-       (new-cl (implies-expr (ttmrg-correct-expr (make-ttmrg-trivial goal)) goal))
-       (- (cw "ttmrg-triv-cp: new-cl = ~q0~%" new-cl)))
-    (value (list (list new-cl)))))
-
-(defrule correctness-of-ttmrg-triv-cp
-  (implies (and (pseudo-term-listp cl)
-                (alistp a)
-                (ev-smtcp
-                 (conjoin-clauses
-                  (acl2::clauses-result
-                   (ttmrg-triv-cp cl hints state)))
-                 a))
-           (ev-smtcp (disjoin cl) a))
-  :expand (ttmrg-triv-cp cl hints state)
-  :rule-classes :clause-processor)
