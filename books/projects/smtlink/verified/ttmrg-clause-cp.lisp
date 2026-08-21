@@ -71,7 +71,6 @@
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((unless (pseudo-term-syntax-p goal)) (mv t nil state))
        ((mv fail tterm) (ttmrg-parse-clause goal))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal (current-cp-fn) *SMT-architecture*)))
@@ -97,5 +96,41 @@
            (ev-smtcp (disjoin cl) a))
   :do-not-induct t
   :expand (tterm-trans-fn-cp cl hint state)
+  :in-theory (disable ev-smtcp-of-disjoin)
+  :rule-classes :clause-processor)
+
+
+(define tterm-identity-cp ((cl pseudo-term-listp)
+                           (hint t)
+                           state)
+  (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
+       ((unless (smtlink-hint-p hint)) (mv t nil state))
+       (goal (disjoin cl))
+       ((mv fail tterm)
+        (prog2$ (cw "SMT-tterm-identity-cp goal: ~x0"
+                    goal)
+                (ttmrg-parse-clause goal)))
+       ((if fail) (mv t nil state))
+       (next-cp (cdr (assoc-equal 'tterm-identity *SMT-architecture*)))
+       ((if (null next-cp)) (mv t nil state))
+       (the-hint
+         `(:clause-processor (,next-cp clause ',hint state)))
+       (new-cl (ttmrg-clause tterm))
+       (hinted-goal `((hint-please ',the-hint) ,new-cl)))
+    (value (list hinted-goal))))
+
+
+(defrule correctness-of-tterm-identity-cp
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-term-listp cl)
+                (alistp a)
+                (ev-smtcp
+                  (conjoin-clauses
+                    (acl2::clauses-result
+                      (tterm-identity-cp cl hint state)))
+                  a))
+           (ev-smtcp (disjoin cl) a))
+  :do-not-induct t
+  :expand (tterm-identity-cp cl hint state)
   :in-theory (disable ev-smtcp-of-disjoin)
   :rule-classes :clause-processor)

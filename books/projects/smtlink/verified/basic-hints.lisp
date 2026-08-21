@@ -82,147 +82,172 @@
   (list (make-smt-function :name 'symbolp
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-symbolp))
+                                            :formals '(x)
+                                            :thm 'return-of-symbolp))
                            :translation-hint
                            (make-trans-hint :translation "Symbol_z3.z3Sym"))
         (make-smt-function :name 'integerp
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-integerp))
+                                            :formals '(x)
+                                            :thm 'return-of-integerp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.IntSort()"))
         (make-smt-function :name 'booleanp
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-booleanp))
+                                            :formals '(x)
+                                            :thm 'return-of-booleanp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.BoolSort()"))
         (make-smt-function :name 'rationalp
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-rationalp))
+                                            :formals '(x)
+                                            :thm 'return-of-rationalp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.RealSort()"))
         (make-smt-function :name 'symbol-fix
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-symbol-fix)))
+                                            :formals '(x)
+                                            :thm 'return-of-symbol-fix)))
         (make-smt-function :name 'bool-fix
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-bool-fix)))
+                                            :formals '(x)
+                                            :thm 'return-of-bool-fix)))
         (make-smt-function :name 'ifix
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-ifix)))
+                                            :formals '(x)
+                                            :thm 'return-of-ifix)))
         (make-smt-function :name 'rfix
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-rfix)))
+                                            :formals '(x)
+                                            :thm 'return-of-rfix)))
         (make-smt-function :name 'not
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-not))
+                                            :formals '(x)
+                                            :thm 'return-of-not))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.notx"))
         (make-smt-function :name 'equal
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-equal-booleanp)
+                                            :formals '(x y)
+                                            :thm 'return-of-equal-booleanp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-equal-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-equal-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-equal-rationalp)
+                                            :formals '(x y)
+                                            :thm 'return-of-equal-rationalp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-equal-symbolp))
+                                            :formals '(x y)
+                                            :thm 'return-of-equal-symbolp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.equal"))
         (make-smt-function :name '<
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-<-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-<-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-<-rationalp-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-<-rationalp-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm
-                                           'return-of-<-integerp-rationalp)
+                                            :formals '(x y)
+                                            :thm
+                                            'return-of-<-integerp-rationalp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-<-rationalp))
+                                            :formals '(x y)
+                                            :thm 'return-of-<-rationalp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.lt"))
         (make-smt-function :name 'unary--
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-unary---integerp)
+                                            :formals '(x)
+                                            :thm 'return-of-unary---integerp)
                                           (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-unary---rationalp))
+                                            :formals '(x)
+                                            :thm 'return-of-unary---rationalp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.negate"))
         (make-smt-function :name 'unary-/
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x)
-                                           :thm 'return-of-unary-/-integerp)
+                                            :formals '(x)
+                                            :thm 'return-of-unary-/-integerp)
                                           (make-thm-spec
-                                           :formals '(x)
-                                           :thm
-                                           'return-of-unary-/-rationalp))
+                                            :formals '(x)
+                                            :thm
+                                            'return-of-unary-/-rationalp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.reciprocal"))
         (make-smt-function :name 'binary-+
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-binary-+-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-binary-+-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-binary-+-rationalp-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-binary-+-rationalp-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm
-                                           'return-of-binary-+-integerp-rationalp)
+                                            :formals '(x y)
+                                            :thm
+                                            'return-of-binary-+-integerp-rationalp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-binary-+-rationalp))
+                                            :formals '(x y)
+                                            :thm 'return-of-binary-+-rationalp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.plus"))
         (make-smt-function :name 'binary-*
                            :kind :basic
                            :returns (list (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-binary-*-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-binary-*-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm 'return-of-binary-*-rationalp-integerp)
+                                            :formals '(x y)
+                                            :thm 'return-of-binary-*-rationalp-integerp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm
-                                           'return-of-binary-*-integerp-rationalp)
+                                            :formals '(x y)
+                                            :thm
+                                            'return-of-binary-*-integerp-rationalp)
                                           (make-thm-spec
-                                           :formals '(x y)
-                                           :thm
-                                           'return-of-binary-*-rationalp))
+                                            :formals '(x y)
+                                            :thm
+                                            'return-of-binary-*-rationalp))
                            :translation-hint
                            (make-trans-hint :translation "_SMT_.times"))
+        (make-smt-function :name 'rational-+
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x y)
+                                            :thm 'return-of-rational-+)))
+        (make-smt-function :name 'rational--
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x)
+                                            :thm 'return-of-rational--)))
+        (make-smt-function :name 'rational-*
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x y)
+                                            :thm 'return-of-rational-*)))
+        (make-smt-function :name 'rational-/
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x)
+                                            :thm 'return-of-rational-/)))
+        (make-smt-function :name 'rational-<
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x y)
+                                            :thm 'return-of-rational-<)))
         (make-smt-function :name 'if
                            :kind :basic
                            :translation-hint

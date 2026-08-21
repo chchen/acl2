@@ -720,7 +720,7 @@
        (functions (type-options->functions options))
        (conspair (assoc-equal f functions))
        ((unless conspair)
-	(er hard? "no returns theorem found for ~x0~%" f))
+	(er hard? 'top-level "no returns theorem found for ~x0~%" f))
        (rj (returns-judgement
 	     f actuals-expr actuals-judgements-top (cdr conspair)
 	     path-cond ''t state))
@@ -795,7 +795,6 @@
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((unless (pseudo-term-syntax-p goal)) (mv t nil state))
        ((mv fail tterm) (ttmrg-parse-clause goal))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal 'type-judge-bottom-up *SMT-architecture*)))

@@ -137,6 +137,16 @@
     (defcong pseudo-term-list-equiv equal (and-list-expr lst) 1
       :hints(("Goal" :induct (pairlis$ lst lst-equiv)))))
 
+  (define equal-expr ((x pseudo-termp) (y pseudo-termp))
+    :returns (x=y pseudo-termp)
+    (and (pseudo-termp x) (pseudo-termp y) `(equal ,x ,y))
+    ///
+    (more-returns
+     (x=y :name ev-smtcp-of-equal-expr
+          (implies (and (pseudo-termp x) (pseudo-termp y) (alistp a))
+                   (equal (ev-smtcp x=y a)
+		          (equal (ev-smtcp x a) (ev-smtcp y a)))))))
+
   (define implies-expr ((x pseudo-termp) (y pseudo-termp))
     :returns (x=>y pseudo-termp)
     (and (pseudo-termp x) (pseudo-termp y) `(if ,x (if ,y 't 'nil) 't))
@@ -970,4 +980,51 @@
 	:flag list)
       :hints(("Goal"
 	:in-theory (enable ttmrg-correct-p ttmrg-list-correct-p
-			   ev-and pseudo-term-ev implies-expr))))))
+			   ev-and pseudo-term-ev implies-expr)))))
+
+  (defines ttmrg-correct-smt-expr
+    :verify-guards nil
+    :ruler-extenders :all
+    (define ttmrg-correct-smt-expr ((tterm ttmrg-p))
+      :returns (expr pseudo-termp)
+      :flag term
+      :measure (ttmrg->expr-count tterm)
+      (b* (;((unless (mbt (ttmrg-p tterm))) nil)
+	   (path  (ttmrg->path-cond-expr  tterm))
+           (smt-judge (ttmrg->smt-judgements-expr tterm))
+	   (guts-expr
+	     (case (ttmrg->kind tterm)
+	       (:var ''t)
+	       (:quote ''t)
+	       (:if
+		 (and-list-expr (list
+		   (ttmrg-correct-expr (ttmrg->condx tterm))
+		   (ttmrg-correct-expr (ttmrg->thenx tterm))
+		   (ttmrg-correct-expr (ttmrg->elsex tterm))
+		   (implies-expr
+		     path
+		     (and-expr
+		       (ttmrg->path-cond-expr (ttmrg->condx tterm))
+		       (list 'if (ttmrg->expr (ttmrg->condx tterm))
+			  (ttmrg->path-cond-expr (ttmrg->thenx tterm))
+			  (ttmrg->path-cond-expr (ttmrg->elsex tterm))))))))
+	       (:fncall
+		 (and-expr
+		   (ttmrg-list-correct-smt-expr (ttmrg->args tterm))
+		   (implies-expr
+		     path
+		     (args->path-cond-expr (ttmrg->args tterm))))))))
+        (and-expr (implies-expr path smt-judge)
+                  guts-expr)))
+
+    (define ttmrg-list-correct-smt-expr ((lst ttmrg-list-p))
+      :returns (expr pseudo-termp)
+      :flag list
+      :measure (ttmrg-list->expr-list-count lst)
+      (if (consp lst)
+	(and-expr (ttmrg-correct-smt-expr (car lst))
+	     (ttmrg-list-correct-smt-expr (cdr lst)))
+	''t ;(kwote (equal lst nil))
+	))
+    ///
+    (verify-guards ttmrg-correct-smt-expr)))

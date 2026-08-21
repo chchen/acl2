@@ -13,8 +13,12 @@
 (include-book "std/util/bstar" :dir :system)
 (include-book "xdoc/top" :dir :system)
 (include-book "std/util/define" :dir :system)
+(include-book "tools/rewrite-dollar" :dir :system)
 
 (include-book "hint-interface")
+(include-book "ttmrg-clause")
+(include-book "term-rewrite")
+(include-book "../trusted/smt-lib")
 
 (defsection SMT-computed-hints
   :parents (verified)
@@ -67,8 +71,8 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
                  (post true-listp))
     :measure (len kwd-alist)
     :hints (("Goal" :in-theory (disable true-list-fix-preserve-length)
-             :use ((:instance true-list-fix-preserve-length
-                              (x kwd-alist)))))
+                    :use ((:instance true-list-fix-preserve-length
+                                     (x kwd-alist)))))
     (b* ((kwd-alist (true-list-fix kwd-alist))
          ((unless (consp kwd-alist)) (mv nil nil))
          ((if (eq key (car kwd-alist)))
@@ -89,12 +93,12 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
     :returns (new-kwd-alist
               true-listp
               :hints (("Goal"
-                       :in-theory (disable
-                                   true-listp-of-my-split-kwd-alist.post)
-                       :use ((:instance
-                              true-listp-of-my-split-kwd-alist.post
-                              (key :in-theory)
-                              (kwd-alist (true-list-fix kwd-alist)))))))
+                        :in-theory (disable
+                                     true-listp-of-my-split-kwd-alist.post)
+                        :use ((:instance
+                                true-listp-of-my-split-kwd-alist.post
+                                (key :in-theory)
+                                (kwd-alist (true-list-fix kwd-alist)))))))
     :guard-debug t
     (b* ((kwd-alist (true-list-fix kwd-alist))
          ((mv pre post)
@@ -125,19 +129,19 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
                ,@(cddr post)))
             (t `(;; :do-not '(preprocess)
                  :in-theory (enable ,@enabled)
-                            ,@kwd-alist
-                            )))))
+                 ,@kwd-alist
+                 )))))
 
   (define treat-expand-hint ((expand-lst true-listp) (kwd-alist true-listp))
     :returns (new-kwd-alist
               true-listp
               :hints (("Goal"
-                       :in-theory (disable
-                                   true-listp-of-my-split-kwd-alist.post)
-                       :use ((:instance
-                              true-listp-of-my-split-kwd-alist.post
-                              (key :expand)
-                              (kwd-alist (true-list-fix kwd-alist)))))))
+                        :in-theory (disable
+                                     true-listp-of-my-split-kwd-alist.post)
+                        :use ((:instance
+                                true-listp-of-my-split-kwd-alist.post
+                                (key :expand)
+                                (kwd-alist (true-list-fix kwd-alist)))))))
     (b* ((kwd-alist (true-list-fix kwd-alist))
          ((mv pre post)
           (my-split-kwd-alist :expand kwd-alist)))
@@ -148,8 +152,8 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
                         ,@(cadr post))
                ,@post))
             (t ; simply extend kwd-alist
-             `(:expand ,@expand-lst
-                       ,@kwd-alist)))))
+              `(:expand ,@expand-lst
+                ,@kwd-alist)))))
 
   (program)
   (define extract-hint-wrapper (cl)
@@ -167,22 +171,26 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
     clause-processor, and install the @(tsee SMT::SMT-delayed-hint) for
     applying the actual hints."
     (b* (((mv & kwd-alist) (extract-hint-wrapper cl))
-         ((if (equal (car kwd-alist) :clause-processor))
-          (prog2$ (cw "Clause-processor ~q0" (caadr kwd-alist))
-                  `(:computed-hint-replacement
-                    ((SMT-delayed-hint clause ',kwd-alist))
-                    :clause-processor (remove-hint-please clause)))))
-      `(:computed-hint-replacement
-        ((SMT-delayed-hint clause ',kwd-alist))
-        :clause-processor (remove-hint-please clause))))
+         ((unless (equal (car kwd-alist) :clause-processor)) nil)
+         (cp-hint-args (cadr kwd-alist))
+         (next-cp (nth 0 cp-hint-args))
+         (next-computed-hint (case next-cp
+                               ('term-rewrite-cp   'SMT-term-rewrite-hint)
+                               ('smtlib-trusted-cp 'SMT-expr-simplify-hint)
+                               (otherwise          'SMT-delayed-hint))))
+      (prog2$ (cw "Clause-processor ~q0" next-cp)
+              `(:computed-hint-replacement
+                ((,next-computed-hint clause ',kwd-alist state))
+                :clause-processor (remove-hint-please clause)))))
 
-  (define SMT-delayed-hint (cl kwd-alist)
+  (define SMT-delayed-hint (cl kwd-alist state)
     :parents (SMT-computed-hints)
-    :short "@('SMT::SMT-delayed-hints') applies the hints @('kwd-alist') and
+    :short "@('SMT::SMT-delayed-hint') applies the hints @('kwd-alist') and
     install the @(tsee SMT::SMT-computed-hint) back."
     (declare (ignore cl))
-    `(:computed-hint-replacement ((SMT-computed-hint clause))
-      ,@kwd-alist))
+    (prog2$ (cw "SMT-delayed-hint")
+            (value `(:computed-hint-replacement ((SMT-computed-hint clause))
+                     ,@kwd-alist))))
 
   (logic)
 

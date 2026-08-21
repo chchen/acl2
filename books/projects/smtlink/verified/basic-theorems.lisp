@@ -9,6 +9,78 @@
 (include-book "xdoc/top" :dir :system)
 (include-book "centaur/fty/basetypes" :dir :system)
 
+;; SMT theory constrained functions
+(encapsulate
+    (((rational-+ * *) => *)
+     ((rational-- *) => *)
+     ((rational-* * *) => *)
+     ((rational-/ *) => *)
+     ((rational-< * *) => *))
+
+  (local
+    (defun rational-+ (x y)
+      (binary-+ x y)))
+
+  (local
+    (defun rational-- (x)
+      (unary-- x)))
+
+  (local
+    (defun rational-* (x y)
+      (binary-* x y)))
+
+  (local
+    (defun rational-/ (x)
+      (unary-/ x)))
+
+  (local
+    (defun rational-< (x y)
+      (< x y)))
+
+  (defthm return-of-rational-+
+    (implies (and (rationalp x)
+                  (rationalp y))
+             (rationalp (rational-+ x y))))
+
+  (defthm return-of-rational--
+    (implies (rationalp x)
+             (rationalp (rational-- x))))
+
+  (defthm return-of-rational-*
+    (implies (and (rationalp x)
+                  (rationalp y))
+             (rationalp (rational-* x y))))
+
+  (defthm return-of-rational-/
+    (implies (rationalp x)
+             (rationalp (rational-/ x))))
+
+  (defthm return-of-rational-<
+    (implies (and (rationalp x)
+                  (rationalp y))
+             (booleanp (rational-< x y))))
+
+  (defthmd specialize-binary-rational-operators
+    (implies (and (rationalp x)
+                  (rationalp y))
+             (and (equal (binary-+ x y)
+                         (rational-+ x y))
+                  (equal (binary-* x y)
+                         (rational-* x y))
+                  (equal (< x y)
+                         (rational-< x y)))))
+
+  (defthmd specialize-unary-rational-
+    (implies (rationalp x)
+             (equal (unary-- x)
+                    (rational-- x))))
+
+  (defthmd specialize-unary-rational-/
+    (implies (and (rationalp x)
+                  (not (= x 0)))
+             (equal (unary-/ x)
+                    (rational-/ x)))))
+
 ;; --------------------------------------
 ;; Returns theorems
 

@@ -15,9 +15,15 @@
 (include-book "verified/add-hypo-cp")
 (include-book "verified/expand-cp")
 (include-book "verified/reorder-hypotheses")
+(include-book "verified/term-rewrite")
 (include-book "verified/type-inference-bottomup")
 (include-book "verified/type-inference-topdown")
+(include-book "verified/ttmrg-triv-cp")
+(include-book "verified/ti-bottom-up3")
+(include-book "verified/ti-top-down")
 (include-book "verified/term-replacement")
+(include-book "verified/term-rewrite")
+(include-book "verified/tterm-type-extract")
 (include-book "verified/hint-generation")
 (include-book "verified/type-extract")
 (include-book "verified/alist/alist-macro")
@@ -28,9 +34,9 @@
 (include-book "trusted/run")
 (include-book "trusted/trusted-cp")
 (include-book "trusted/write")
+(include-book "trusted/smt-lib")
 
 ;; trusted/z3-py
 (include-book "trusted/z3-py/header")
 (include-book "trusted/z3-py/names")
 (include-book "trusted/z3-py/translate")
-

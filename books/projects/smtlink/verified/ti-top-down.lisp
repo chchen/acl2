@@ -1,5 +1,5 @@
 ;; Copyright (C) 2015, University of British Columbia
-;; Written by Yan Peng (December 30th 2019)
+;; Written by Chris Chen (May 2024)
 ;;
 ;; License: A 3-clause BSD license.
 ;; See the LICENSE file distributed with ACL2
@@ -42,8 +42,12 @@
 (defval *top-down-priority*
   '((rationalp smt::x)
     (integerp smt::x)
+    (natp smt::x)
     (booleanp smt::x)
-    (symbolp smt::x)))
+    (symbolp smt::x)
+    (acl2::maybe-nat-sym-consp smt::x)
+    (acl2::nat-sym-consp smt::x)
+    (acl2::nat-sym-alist-p smt::x)))
 
 
 (defval *bool-judgement*
@@ -817,7 +821,6 @@
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((unless (pseudo-term-syntax-p goal)) (mv t nil state))
        ((mv fail tterm) (ttmrg-parse-clause goal))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal 'type-judge-top-down *SMT-architecture*)))

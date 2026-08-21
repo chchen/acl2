@@ -1252,13 +1252,15 @@
             (:rm-file (booleanp second))
             (:global-hint (symbolp second))
             (:wrld-fn-len (natp second))
+            (:translation-theory (pseudo-termp second))
             (:customp (booleanp second))
             (t (er hard? 'process=>smtlink-hint-syntax-p-helper
                    "Smtlink-hint option doesn't include: ~p0. ~
                        They are :functions, :hypotheses, :acl2types, ~
                        :datatypes, :arrays, :replaces :int-to-ratp, ~
                        :under-inductionp, :smt-dir, :smt-fname, :rm-file, ~
-                       :global-hint, :wrld-fn-len, and :customp.~%"
+                       :global-hint, :wrld-fn-len, :translation-theory, ~
+                       and :customp.~%"
                    first)))))
       (and first-ok
            (smtlink-hint-syntax-p-helper rest (cons first used))))
@@ -1290,6 +1292,8 @@
                                 (symbolp (cadr term)))
                        (implies (equal (car term) :wrld-fn-len)
                                 (natp (cadr term)))
+                       (implies (equal (car term) :translation-theory)
+                                (pseudo-termp (cadr term)))
                        (implies (equal (car term) :customp)
                                 (booleanp (cadr term)))))
          :hints (("Goal"
@@ -1307,7 +1311,8 @@
                        (not (equal (car term) :smt-fname))
                        (not (equal (car term) :rm-file))
                        (not (equal (car term) :global-hint))
-                       (not (equal (car term) :wrld-fn-len)))
+                       (not (equal (car term) :wrld-fn-len))
+                       (not (equal (car term) :translation-theory)))
                   (equal (car term) :customp))
          :hints (("Goal"
                   :expand (smtlink-hint-syntax-p-helper term used)))
@@ -1358,6 +1363,8 @@
                                 (symbolp (cadr term)))
                        (implies (equal (car term) :wrld-fn-len)
                                 (natp (cadr term)))
+                       (implies (equal (car term) :translation-theory)
+                                (pseudo-termp (cadr term)))
                        (implies (equal (car term) :customp)
                                 (booleanp (cadr term)))))
          :name definition-of-smtlink-hint-syntax-p)
@@ -1373,7 +1380,8 @@
                        (not (equal (car term) :smt-fname))
                        (not (equal (car term) :rm-file))
                        (not (equal (car term) :global-hint))
-                       (not (equal (car term) :wrld-fn-len)))
+                       (not (equal (car term) :wrld-fn-len))
+                       (not (equal (car term) :translation-theory)))
                   (equal (car term) :customp))
          :name option-of-smtlink-hint-syntax-p)
      (ok (implies (and ok (consp term))
@@ -1963,6 +1971,15 @@
        (new-hint (change-smtlink-hint hint :wrld-fn-len content)))
     new-hint))
 
+(define set-translation-theory ((content pseudo-termp)
+                                (hint smtlink-hint-p))
+  :returns (new-hint smtlink-hint-p)
+  :short "Set :translation-theory"
+  (b* ((hint (smtlink-hint-fix hint))
+       (content (pseudo-term-fix content))
+       (new-hint (change-smtlink-hint hint :translation-theory content)))
+    new-hint))
+
 (define combine-hints ((user-hint smtlink-hint-syntax-p)
                        (hint smtlink-hint-p))
   :returns (combined-hint smtlink-hint-p)
@@ -1995,6 +2012,7 @@
                    (:smt-dir (set-smt-dir second hint))
                    (:global-hint (set-global-hint second hint))
                    (:wrld-fn-len (set-wrld-fn-len second hint))
+                   (:translation-theory (set-translation-theory second hint))
                    (:customp (set-smt-cnf second hint)))))
     (combine-hints rest new-hint)))
 

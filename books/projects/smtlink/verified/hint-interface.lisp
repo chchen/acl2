@@ -371,6 +371,7 @@
    (under-inductionp symbolp :default nil)
    (global-hint symbolp :default nil)
    (wrld-fn-len natp :default 0)
+   (translation-theory pseudo-termp :default nil)
    (customp booleanp :default nil)
    (trusted-hint trusted-hint-p :default (make-trusted-hint))))
 

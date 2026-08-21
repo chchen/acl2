@@ -7,6 +7,7 @@
 
 (in-package "SMT")
 (include-book "xdoc/top" :dir :system)
+(include-book "hints/hint-wrapper" :dir :system)
 (include-book "tools/defevaluator-fast" :dir :system)
 (include-book "clause-processors/just-expand" :dir :system)
 (include-book "clause-processors/meta-extract-user" :dir :system)
@@ -24,6 +25,7 @@
                           (iff a b)
                           (implies a b)
                           (hint-please hint)
+                          (acl2::hint-wrapper hint)
                           (return-last x y z)
                           (binary-+ x y)
                           (integerp x)

@@ -30,6 +30,32 @@
   acl2::pseudo-termp-car all-tail<judge-ev> acl2::subsetp-car-member)))
 
 
+;; (define ttmrg-debug-cp ((cl pseudo-term-listp)
+;; 		        (hint t)
+;; 		        state)
+;;   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
+;;        ((unless (smtlink-hint-p hint)) (mv t nil state))
+;;        (goal (disjoin cl))
+;;        ((mv fail tterm) (ttmrg-parse-clause goal))
+;;        ((if fail) (mv t nil state)))
+;;     (prog2$ (cw "ttmrg-debug-cp typed-term:~x0"
+;;                 tterm)
+;;             (mv t nil state))))
+
+
+;; (defrule correctness-of-ttmrg-debug-cp
+;;   (implies (and (pseudo-term-listp cl)
+;;                 (alistp a)
+;;                 (ev-smtcp
+;;                   (conjoin-clauses
+;;                     (acl2::clauses-result
+;;                       (ttmrg-debug-cp cl hint state)))
+;;                   a))
+;;            (ev-smtcp (disjoin cl) a))
+;;   :expand (ttmrg-debug-cp cl hint state)
+;;   :rule-classes :clause-processor)
+
+
 (define ttmrg-triv-cp ((cl pseudo-term-listp)
 		       (hint t)
 		       state)
@@ -43,7 +69,6 @@
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
        (new-cl (ttmrg-clause new-tt))
-       (- (cw "ttmrg-triv-cp: new-cl = ~q0~%" new-cl))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 
