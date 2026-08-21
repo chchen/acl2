@@ -73,7 +73,7 @@
     :measure (list (ttmrg->expr-count tterm) 2 0)
     :returns (ok booleanp)
     (b* ((tterm (ttmrg-fix tterm))
-	 ((unless (set::empty (ttmrg->smt-judgements tterm)))
+	 ((unless (set::emptyp (ttmrg->smt-judgements tterm)))
           nil))
       (case (ttmrg->kind tterm)
 	(:quote t)
@@ -329,7 +329,7 @@
   :returns (rv judge-set-p)
   (b* ((judgements (judge-set-fix judgements))
        (recognizers (pseudo-term-list-fix recognizers))
-       ((if (set::empty judgements)) nil)
+       ((if (set::emptyp judgements)) nil)
        ((unless (consp recognizers)) nil)
        ((cons head tail) recognizers))
     (if (set::in head judgements)
@@ -462,7 +462,7 @@
                     (pseudo-termp tterm))
 	       (equal (and-list (judge-ev-lst j-set tterm a))
                       (all<judge-ev> j-set tterm a)))
-      :in-theory (enable set::empty
+      :in-theory (enable set::emptyp
 		         set::cardinality)
       ;;		     osets-list-set-equivalents)
       :induct (set::cardinality j-set)))

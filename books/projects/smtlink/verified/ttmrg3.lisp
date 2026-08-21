@@ -34,7 +34,7 @@
 ;  without disabling any runes below: 136s
 ;  disabling the runes following 7.7s
 (local (in-theory (disable pseudo-termp ;; Mark is impatient
-  symbol-listp pseudo-term-listp-of-cdr-of-pseudo-termp set::sfix-when-empty
+  symbol-listp pseudo-term-listp-of-cdr-of-pseudo-termp
   acl2::pseudo-lambdap-of-car-when-pseudo-termp set::insert-identity
   pseudo-term-listp-of-symbol-listp acl2::pseudo-termp-list-cdr set::in-tail
   acl2::true-listp-of-car-when-true-list-listp integerp-when-maybe-integerp
@@ -42,7 +42,7 @@
   acl2::symbol-listp-when-not-consp consp-of-cdr-of-pseudo-lambdap
   member-equal acl2::pseudo-termp-car set::nonempty-means-set set::union-in
   acl2::pseudo-termp-cadr-from-pseudo-term-listp maybe-integerp-when-integerp
-  acl2::pseudo-lambdap-of-car-when-pseudo-lambda-listp set::insert-when-empty
+  acl2::pseudo-lambdap-of-car-when-pseudo-lambda-listp
   acl2::integerp-of-car-when-integer-listp integer-listp rational-listp
   acl2::rationalp-of-car-when-rational-listp default-cdr
   acl2::pseudo-lambdap-when-member-equal-of-pseudo-lambda-listp
@@ -263,7 +263,7 @@
   (define judge-set-expr ((J judge-set-p))
     :returns (x pseudo-termp)
     :verify-guards nil
-    (if (set::empty J)
+    (if (set::emptyp J)
       ''t
       (and-expr (pseudo-term-fix (set::head J))
 		(judge-set-expr (set::tail J))))
@@ -321,7 +321,7 @@
   (define pseudo-term-set-expr ((cl pseudo-term-set-p))
     :returns (x pseudo-termp)
     :verify-guards nil
-    (if (set::empty cl)
+    (if (set::emptyp cl)
       ''t
       (and-expr (set::head cl)
 		(pseudo-term-set-expr (set::tail cl))))

@@ -367,7 +367,7 @@
          ((unless (null erp))
           (check-sat-error "tempfile-io" nil state))
          (cmdstr (concatenate 'string "/opt/homebrew/bin/z3 -smt2 " file-name))
-         ((mv status lines) (tshell-call cmdstr :print nil :save t))
+         ((mv status lines state) (tshell-call cmdstr :print nil :save t))
          ((unless (= status 0))
           (check-sat-error "solver" lines state)))
       (if (equal lines (list "unsat"))
