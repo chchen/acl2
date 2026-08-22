@@ -220,7 +220,7 @@
     (b* ((x (rfix x)))
       (if (integerp x)
           (if (< x 0)
-              `(- ,x)
+              `(- ,(- x))
             x)
         `(/ ,(emit-number (numerator x))
             ,(emit-number (denominator x)))))
@@ -375,8 +375,8 @@
         (mv nil :unknown state))))
 
   (define smtlib-trusted-cp ((cl pseudo-term-listp)
-                           (hint t)
-                           state)
+                             (hint t)
+                             state)
     :guard-debug t
     (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
          ((unless (consp hint)) (mv t nil state))
@@ -393,9 +393,9 @@
                              (smt-assert-negation simp-expr)))
          ((mv fail solver-result state)
           (check-sat-with-z3 smt-script state))
-         ((unless (and (not fail)
-                       (equal solver-result :unsat)))
-          (mv t nil state))
+         ((if fail) (mv t nil state))
+         ((unless (equal solver-result :unsat))
+          (value (list nil)))
          ;; Side condition
          (side-condition (implies-expr (smt-judgement->expr smt-j)
                                        (equal-expr
