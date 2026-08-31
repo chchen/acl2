@@ -990,52 +990,52 @@
          (equal (cdr ttt.term) tta.term-lst)
          (implies tta.term-lst (equal ttt.path-cond tta.path-cond)))))
 
-(skip-proofs
-(define make-typed-fncall ((tt-top typed-term-p)
-                           (tt-actuals typed-term-list-p))
-  :guard (make-typed-fncall-guard tt-top tt-actuals)
-  :returns (new-tt (good-typed-term-p new-tt)
-                   :hints (("Goal"
-                            :in-theory (enable good-typed-fncall-p
-                                               make-typed-fncall-guard))))
-  (b* (((unless (mbt (make-typed-fncall-guard tt-top tt-actuals)))
-        (make-typed-term))
-       ((typed-term ttt) tt-top)
-       (tta.judgements (typed-term-list->judgements tt-actuals)))
-    (make-typed-term
-     :term ttt.term
-     :path-cond ttt.path-cond
-     :judgements `(if ,ttt.judgements ,tta.judgements 'nil)))
-  ///
-  (more-returns
-   (new-tt (typed-term-p new-tt)
-           :name typed-term-of-make-typed-fncall)
-   (new-tt (implies (make-typed-fncall-guard tt-top tt-actuals)
-                    (equal (typed-term->term new-tt)
-                           (typed-term->term tt-top)))
-           :name make-typed-fncall-maintains-term)
-   (new-tt (implies (make-typed-fncall-guard tt-top tt-actuals)
-                    (equal (typed-term->path-cond new-tt)
-                           (typed-term->path-cond tt-top)))
-           :name make-typed-fncall-maintains-path-cond))
-  (defthm correctness-of-make-typed-fncall
-    (implies (and (ev-smtcp-meta-extract-global-facts)
-                  (typed-term-p tt-top)
-                  (good-typed-term-list-p tt-actuals)
-                  (alistp a)
-                  (ev-smtcp (correct-typed-term tt-top) a)
-                  (ev-smtcp (correct-typed-term-list tt-actuals) a))
-             (ev-smtcp (correct-typed-term
-                        (make-typed-fncall tt-top tt-actuals))
-                       a))
-    :hints (("Goal"
-             :do-not-induct t
-             :in-theory (e/d (correct-typed-term
-                              correct-typed-term-list
-                              make-typed-fncall-guard)
-                             ()))))
-  )
-)
+;; (skip-proofs
+;; (define make-typed-fncall ((tt-top typed-term-p)
+;;                            (tt-actuals typed-term-list-p))
+;;   :guard (make-typed-fncall-guard tt-top tt-actuals)
+;;   :returns (new-tt (good-typed-term-p new-tt)
+;;                    :hints (("Goal"
+;;                             :in-theory (enable good-typed-fncall-p
+;;                                                make-typed-fncall-guard))))
+;;   (b* (((unless (mbt (make-typed-fncall-guard tt-top tt-actuals)))
+;;         (make-typed-term))
+;;        ((typed-term ttt) tt-top)
+;;        (tta.judgements (typed-term-list->judgements tt-actuals)))
+;;     (make-typed-term
+;;      :term ttt.term
+;;      :path-cond ttt.path-cond
+;;      :judgements `(if ,ttt.judgements ,tta.judgements 'nil)))
+;;   ///
+;;   (more-returns
+;;    (new-tt (typed-term-p new-tt)
+;;            :name typed-term-of-make-typed-fncall)
+;;    (new-tt (implies (make-typed-fncall-guard tt-top tt-actuals)
+;;                     (equal (typed-term->term new-tt)
+;;                            (typed-term->term tt-top)))
+;;            :name make-typed-fncall-maintains-term)
+;;    (new-tt (implies (make-typed-fncall-guard tt-top tt-actuals)
+;;                     (equal (typed-term->path-cond new-tt)
+;;                            (typed-term->path-cond tt-top)))
+;;            :name make-typed-fncall-maintains-path-cond))
+;;   (defthm correctness-of-make-typed-fncall
+;;     (implies (and (ev-smtcp-meta-extract-global-facts)
+;;                   (typed-term-p tt-top)
+;;                   (good-typed-term-list-p tt-actuals)
+;;                   (alistp a)
+;;                   (ev-smtcp (correct-typed-term tt-top) a)
+;;                   (ev-smtcp (correct-typed-term-list tt-actuals) a))
+;;              (ev-smtcp (correct-typed-term
+;;                         (make-typed-fncall tt-top tt-actuals))
+;;                        a))
+;;     :hints (("Goal"
+;;              :do-not-induct t
+;;              :in-theory (e/d (correct-typed-term
+;;                               correct-typed-term-list
+;;                               make-typed-fncall-guard)
+;;                              ()))))
+;;   )
+;; )
 
 (encapsulate nil ; A brutal proof of the obvious
   (local (defthm lemma-1

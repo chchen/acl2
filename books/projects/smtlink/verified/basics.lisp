@@ -56,17 +56,11 @@
   '((process-hint              . add-hypo-cp)
     (add-hypo                  . expand-cp)
     (expand                    . reorder-hypotheses-cp)
-    (reorder                   . ttmrg-triv-cp)
-    (ttmrg-triv                . type-judge-bottom-up-cp)
+    (reorder                   . type-judge-bottom-up-cp)
     (type-judge-bottom-up      . type-judge-top-down-cp)
     (type-judge-top-down       . term-rewrite-cp)
     (term-rewrite              . tterm-type-extract-cp)
-    (tterm-type-extract        . smtlib-trusted-cp)
-    ;; old backend follows
-    (term-replacement          . hint-generation-cp)
-    (hint-generation           . type-extract-cp)
-    (type-extract              . smt-trusted-cp)
-    (type-extract-custom       . smt-trusted-cp-custom)))
+    (tterm-type-extract        . smtlib-trusted-cp)))
 
 ;;----------------------------------------------------------------
 

@@ -19,10 +19,10 @@
 
 (include-book "ttmrg-change3")
 (include-book "ttmrg-clause-cp")
-(include-book "typed-term-fns")
+;;(include-book "typed-term-fns")
 (include-book "returns-judgement")
-(include-book "judgement-fns")
-(include-book "ti-bottom-up3")
+;;(include-book "judgement-fns")
+;;(include-book "ti-bottom-up3")
 
 (set-state-ok t)
 (set-induction-depth-limit 1)
@@ -38,6 +38,287 @@
    default-car
    (:type-prescription pseudo-lambdap)))))
 
+;; Utility functions from old-bottom-up
+(define judge-ev-lst ((lst judge-list-p) (term pseudo-termp) (a alistp))
+  :returns (x true-listp)
+  (if (consp lst)
+    (cons (judge-ev (car lst) term a)
+	  (judge-ev-lst (cdr lst) term a))
+    nil)
+  ///
+  (more-returns
+    (x :name judge-ev-list-when-consp
+      (implies (consp lst)
+	(equal x (cons (judge-ev (car lst) term a)
+		       (judge-ev-lst (cdr lst) term a)))))
+    (x :name judge-ev-list-of-atom
+      (implies (not (consp lst)) (not x)))))
+
+(define parse-conjunct-helper
+    ((term pseudo-termp) (acc pseudo-term-listp))
+  :returns (conjuncts pseudo-term-listp)
+  :verify-guards nil
+  (b* ((term (pseudo-term-fix term))
+       (acc (pseudo-term-list-fix acc))
+       ((if (equal term ''t)) acc)
+       ((unless (and (consp term) (consp (cdr term)) (consp (cddr term))
+		     (consp (cdddr term)) (not (cddddr term))
+		     (equal (car term) 'if)
+		     (equal (cadddr term) ''nil)))
+	(cons term acc))
+       (condx (cadr term))
+       (thenx (caddr term)))
+    (parse-conjunct-helper
+     thenx
+     (parse-conjunct-helper condx acc)))
+  ///
+  (verify-guards parse-conjunct-helper)
+
+  (more-returns
+    (conjuncts :name correctness-of-parse-conjunct-helper
+      (equal (all-list<pseudo-term-ev> conjuncts a)
+	     (and (ev-smtcp (pseudo-term-fix term) a)
+		  (ev-and-list (pseudo-term-list-fix acc) a)))
+      :hints(("Goal"
+	:in-theory (e/d (parse-conjunct-helper pseudo-term-ev)
+			(pseudo-term-list-equiv-implies-equal-ev-and-list-1)))))))
+
+(define parse-conjunct ((term pseudo-termp))
+  :returns pset
+  (std::mergesort (parse-conjunct-helper term nil))
+  ///
+  (more-returns
+    (pset :name pseudo-term-set-p-of-parse-conjunct
+      (pseudo-term-set-p pset))
+
+    (pset :name correctness-of-parse-conjunct
+      (iff (all<pseudo-term-ev> pset a)
+	   (ev-smtcp (pseudo-term-fix term) a)))))
+
+
+(defines parse-judge
+  :verify-guards nil
+  :prepwork (
+    (local (defrule lemma-quote
+      (implies (and (pseudo-termp x) (equal (car x) 'quote))
+	       (and (consp (cdr x)) (not (cddr x))))
+      :in-theory (enable pseudo-termp))))
+  :returns-hints(("Goal" :in-theory (enable judge-p judge-list-p)))
+
+  (define parse-judge-term ((x pseudo-termp) (expr pseudo-termp))
+    :returns (mv (erp booleanp) (new-term judge-p))
+    :flag term
+    (b* ((x (pseudo-term-fix x))
+	 ((if (equal x expr)) (mv nil 'smt::x))
+	 ((unless x) (mv nil x))
+	 ((unless (consp x)) (mv t nil))
+	 ((if (equal (car x) 'quote)) (mv nil x))
+	 ((unless (symbolp (car x))) (mv t nil))
+	 ((mv err-args arg-list) (parse-judge-args (cdr x) expr))
+	 ((if err-args) (mv t nil)))
+      (mv nil (cons (car x) arg-list))))
+
+  (define parse-judge-args ((args pseudo-term-listp) (expr pseudo-termp))
+    :returns (mv (erp booleanp) (new-args judge-list-p))
+    :flag args
+    (b* (((unless (consp args)) (mv nil nil))
+	 ((cons hd tl) args)
+	 ((mv err-hd new-hd) (parse-judge-term hd expr))
+	 ((if err-hd) (mv t nil))
+	 ((mv err-tl new-tl) (parse-judge-args tl expr))
+	 ((if err-tl) (mv t nil)))
+      (mv nil (cons new-hd new-tl))))
+  ///
+  (local (defrule guard-lemma
+    (mv-let (erp new-args)
+	    (parse-judge-args args expr)
+	    (implies (not erp)
+		     (equal (consp new-args) (consp args))))
+    :in-theory (enable parse-judge-args)
+    :induct (len args)))
+  (verify-guards parse-judge-term)
+
+  (local (encapsulate nil ; prepwork for correctness theorems
+    (defrule parse-judge-args-when-atom
+      (mv-let (erp new-args)
+	      (parse-judge-args args expr)
+	      (implies (not (consp args))
+		       (and (not erp) (not new-args))))
+      :in-theory (enable parse-judge-args))
+
+    (defrule parse-judge-args-when-consp
+      (b* (((mv erp new-args) (parse-judge-args args expr))
+	   ((cons hd tl) args)
+	   ((cons new-hd new-tl) new-args)
+	   ((mv erp-hd na-hd) (parse-judge-term hd expr))
+	   ((mv erp-tl na-tl) (parse-judge-args tl expr)))
+	(implies (and (not erp) (consp args))
+		 (and (not erp-hd)
+		      (equal new-hd na-hd)
+		      (not erp-tl)
+		      (equal new-tl na-tl))))
+      :in-theory (enable parse-judge-args)
+      :induct (len args))
+
+    (defrule consp-of-parse-judge-args
+      (implies
+	 (not (mv-nth 0 (parse-judge-args args expr)))
+	 (equal (consp (mv-nth 1 (parse-judge-args args expr)))
+		(consp args)))
+      :in-theory (enable parse-judge-args)
+      :induct (len args))
+
+    (local (in-theory (enable parse-judge-term parse-judge-args judge-ev judge-ev-lst)))
+    (defthm-parse-judge-flag
+      (defthm correctness-lemma-term
+	(mv-let (erp new-term)
+		(parse-judge-term x expr)
+		(implies (not erp)
+			 (equal (judge-ev new-term expr a)
+				(ev-smtcp (pseudo-term-fix x) a))))
+	:flag term)
+
+      (defthm correctness-lemma-args
+	(mv-let (erp new-args)
+		(parse-judge-args args expr)
+		(implies (not erp)
+			 (and (equal (judge-ev-lst new-args expr a)
+				     (ev-smtcp-lst (pseudo-term-list-fix args) a))
+			      (equal (ev-smtcp-lst new-args (cons (cons 'smt::x (ev-smtcp expr a)) nil))
+				     (ev-smtcp-lst (pseudo-term-list-fix args) a)))))
+	:flag args))
+    (local (in-theory (disable parse-judge-term parse-judge-args judge-ev judge-ev-lst)))))
+
+  (defrule correctness-of-parse-judge-term
+    (mv-let (erp new-term)
+	    (parse-judge-term x expr)
+	    (implies (not erp)
+		     (equal (judge-ev new-term expr a)
+			    (ev-smtcp (pseudo-term-fix x) a)))))
+
+  (defrule correctness-of-parse-judge-args
+    (mv-let (erp new-args)
+	    (parse-judge-args args expr)
+	    (implies (not erp)
+		     (iff (all-list<judge-ev> new-args expr a)
+			  (all-list<pseudo-term-ev> args a))))
+    :in-theory (enable all-list<judge-ev> all-list<pseudo-term-ev> pseudo-term-ev)
+    :induct (pairlis$ args new-args)))
+
+; an example -- change to use make-test
+; (parse-judge-term
+;   '(if (integerp (binary-+ x y))
+;      (< '0 (binary-+ x y)))
+;   '(binary-+ x y))
+
+(define parse-judge-set((term pseudo-termp) (judge-pt pseudo-termp))
+  :returns (jset judge-set-p)
+  :guard-debug t
+  (b* ((j-lst (parse-conjunct judge-pt))
+       ((mv erp jx) (parse-judge-args j-lst term))
+       ((if erp)
+	(prog2$
+	  (er hard? 'top-level
+	      (concatenate 'string
+			   "Badly formed judgements for term ~q0~%"
+			   "  judgements ~q1~%")
+	      term judge-pt jx)
+	  '((smt::bad-judgement x)))))
+    (std::mergesort jx))
+  ///
+  (more-returns
+    (jset :name correctness-of-parse-judge-set
+      (implies
+	(not (equal jset '((bad-judgement x))))
+	(iff (all<judge-ev> jset term a)
+	     (ev-smtcp (pseudo-term-fix judge-pt) a))))))
+
+
+(defines judge-flat-expr
+  :returns-hints(("Goal" :in-theory (enable pseudo-termp)))
+  :flag-local nil
+  :verify-guards nil
+  (define judge-flat-expr ((x judge-p) (expr pseudo-termp))
+    :returns (x-flat pseudo-termp)
+    :flag term
+    (if (consp x)
+	(if (equal (car x) 'quote)
+	  (and (consp (cdr x)) (equal (cddr x) nil) x)
+	  (and (symbolp (car x))
+	       (cons (car x)
+		     (judge-list-flat-expr (cdr x) expr))))
+	(and (equal x 'x) (pseudo-term-fix expr))))
+
+  (define judge-list-flat-expr ((lst judge-list-p) (expr pseudo-termp))
+    :returns (lst-flat pseudo-term-listp)
+    :flag list
+    (if (consp lst)
+	(cons (judge-flat-expr (car lst) expr)
+	      (judge-list-flat-expr (cdr lst) expr))
+	nil))
+  ///
+  (verify-guards judge-flat-expr
+    :hints(("Goal" :in-theory (enable judge-p))))
+
+  (local (in-theory (enable judge-flat-expr judge-list-flat-expr judge-p judge-ev judge-ev-lst)))
+  (local (defrule lemma-1
+    (implies (and (judge-list-p lst) (pseudo-termp expr))
+      (equal (judge-ev-lst lst expr a)
+	     (ev-smtcp-lst lst (list (cons 'x (ev-smtcp expr a))))))))
+
+  (defthm-judge-flat-expr-flag
+    (defthm correctness-of-judge-flat-expr
+       (implies (and (judge-p x) (pseudo-termp expr))
+		(equal (ev-smtcp (judge-flat-expr x expr) a)
+		       (judge-ev x expr a)))
+       :flag term)
+    (defthm correctness-of-judge-list-flat-expr
+       (implies (and (judge-list-p lst) (pseudo-termp expr))
+		(equal (ev-smtcp-lst (judge-list-flat-expr lst expr) a)
+		       (judge-ev-lst lst expr a)))
+      :flag list)))
+
+(define args->judgements-expr ((args ttmrg-list-p))
+  :returns (judge-expr pseudo-termp)
+  (if (consp args)
+    (and-expr
+      (and-list-expr (judge-list-flat-expr (ttmrg->judgements (car args))
+					   (ttmrg->expr (car args))))
+      (args->judgements-expr (cdr args)))
+    ''t)
+  ///
+  (defrule ev-smtcp-of-args->judgements-expr
+    (implies (and (ttmrg-list-correct-p args a)
+		  (args->path-cond-ev args a))
+	     (ev-smtcp (args->judgements-expr args) a))
+    :in-theory (enable args->judgements-expr args->path-cond-ev ev-and)
+    :prep-lemmas (
+      (defrule lemma-1
+	(implies
+	  (and (judge-list-p j) (pseudo-termp expr))
+	  (equal
+	    (and-list (judge-ev-lst j expr a))
+	    (all-list<judge-ev> j expr a)))
+	:rule-classes (
+	  (:rewrite :corollary (implies (and (judge-set-p j) (pseudo-termp expr))
+					(equal (and-list (judge-ev-lst j expr a))
+					       (all<judge-ev> j expr a))))))
+
+      (defrule lemma-2
+	(implies
+	  (pseudo-term-listp lst)
+	  (equal (all-list<pseudo-term-ev> lst a)
+		 (and-list (ev-smtcp-lst lst a))))
+	  :in-theory (enable and-list pseudo-term-ev))
+
+      (defrule lemma-3
+	(let ((j (ttmrg->judgements tterm))
+	      (expr (ttmrg->expr tterm)))
+	  (equal (ev-smtcp (and-list-expr (judge-list-flat-expr j expr)) a)
+		 (ttmrg->judgements-ev tterm a)))
+	:expand ((ttmrg->judgements-ev tterm a))))))
+
+;; --- top-town-continues
 
 (defval *top-down-priority*
   '((rationalp smt::x)

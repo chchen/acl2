@@ -41,7 +41,7 @@
 
   (define rewrite$-helper-fn (term hyps theory fuel state)
     (b* (((if (zp fuel))
-          (prog2$ (cw "rewrite$-helper reached limit of ~x0 applications"
+          (prog2$ (cw "rewrite$-helper reached limit of ~x0 applications~%"
                       (rewrite-stack-limit (w state)))
                   (mv t nil state)))
          ((mv rewrite-fail result state)
@@ -49,12 +49,12 @@
                           :hyps hyps
                           :in-theory theory))
          ((if rewrite-fail)
-          (prog2$ (cw "rewrite$-helper failed for ~x0 ~x1"
+          (prog2$ (cw "rewrite$-helper failed for ~x0 ~x1~%"
                       term hyps)
                   (mv t nil state)))
          ((list new-term & &) result)
          ((if (equal term new-term)) (value new-term)))
-      (prog2$ (cw "rewrite$-helper recurse with fuel ~x0"
+      (prog2$ (cw "rewrite$-helper recurse with fuel ~x0~%"
                   (1- fuel))
               (rewrite$-helper-fn new-term hyps theory (1- fuel) state))))
 
@@ -79,22 +79,22 @@
                        (= (len (cadr kwd-alist))
                           4)
                        (state-p state)))
-          (prog2$ (cw "SMT-term-rewrite-hint: preconditions not met")
+          (prog2$ (cw "SMT-term-rewrite-hint: preconditions not met~%")
                   (value nil)))
          ((list* cp-kwd (list next-cp & q-smt-hint &) kwd-alist-tail) kwd-alist)
          ((unless (equal cp-kwd :clause-processor))
-          (prog2$ (cw "SMT-term-rewrite-hint: missing clause processor in kwd-alist: ~x0"
+          (prog2$ (cw "SMT-term-rewrite-hint: missing clause processor in kwd-alist: ~x0~%"
                       kwd-alist)
                   (value nil)))
          ((unless (and (quotep q-smt-hint)
                        (smtlink-hint-p (unquote q-smt-hint))))
-          (prog2$ (cw "not quoted smtlink-hint-p: ~x0" q-smt-hint)
+          (prog2$ (cw "not quoted smtlink-hint-p: ~x0~%" q-smt-hint)
                   (value nil)))
          (smt-hint (unquote q-smt-hint))
          (translation-theory (smtlink-hint->translation-theory smt-hint))
          (goal (disjoin cl))
          ((mv fail tterm) (ttmrg-parse-clause goal))
-         ((if fail) (prog2$ (cw "not a ttmrg-clause: ~x0" tterm)
+         ((if fail) (prog2$ (cw "not a ttmrg-clause: ~x0~%" tterm)
                             (value nil)))
          (expr (ttmrg->expr tterm))
          (correct-smt-exprs (list (ttmrg-correct-smt-expr tterm)))
@@ -104,7 +104,7 @@
                            translation-theory
                            state))
          ((if fail) (value nil)))
-      (prog2$ (cw "SMT-term-rewrite-hint orig: ~x0 new: ~x1"
+      (prog2$ (cw "SMT-term-rewrite-hint orig: ~x0 new: ~x1~%"
                   expr
                   new-expr)
               (value `(:computed-hint-replacement ((SMT-computed-hint clause))
@@ -132,7 +132,7 @@
          (orig-expr (ttmrg->expr tterm))
          (orig-correct-expr (ttmrg-correct-expr tterm)))
       (if (equal orig-expr new-expr)
-          (prog2$ (cw "term-rewrite-cp: rewrite$ did not change term")
+          (prog2$ (cw "term-rewrite-cp: rewrite$ did not change term~%")
                   (b* ((next-cp (cdr (assoc-equal 'term-rewrite
                                                   *SMT-architecture*)))
                        ((if (null next-cp)) (mv t nil state))
@@ -141,7 +141,7 @@
                        (new-cl (ttmrg-clause tterm))
                        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
                     (value (list hinted-goal))))
-        (prog2$ (cw "term-rewrite-cp: feeding new term back into pipeline")
+        (prog2$ (cw "term-rewrite-cp: feeding new term back into pipeline~%")
                 (b* ((next-cp (cdr (assoc-equal 'process-hint
                                                 *SMT-architecture*)))
                      ((if (null next-cp)) (mv t nil state))

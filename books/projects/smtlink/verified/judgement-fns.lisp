@@ -970,7 +970,7 @@ state)
 
 #| mark wrote a macro for these tests, but the test fails in the current
    (2023/05/28) version of judgement-fns.lisp.  :(
- 
+
 (make-test
   (equal (construct-one-super/subtype '(maybe-integerp x)
 			       (make-smt-sub/supertype :type 'integerp
@@ -1580,27 +1580,27 @@ state)
   :returns (type-term-lst pseudo-term-listp)
   (look-up-type-predicate-acc term judge supertype-alst nil))
 
-(skip-proofs
-(defthm type-predicate-of-look-up
-  (implies (and (pseudo-termp term)
-                (pseudo-termp judge)
-                (type-to-types-alist-p supertype-alst)
-                (equal (len (look-up-type-predicate term judge supertype-alst))
-                       1))
-           (and (type-predicate-of-term
-                 (car (look-up-type-predicate term judge supertype-alst))
-                 term supertype-alst)
-                (consp (car (look-up-type-predicate term judge
-                                                    supertype-alst)))
-                (symbolp (caar (look-up-type-predicate term judge
-                                                       supertype-alst)))))
-  :hints (("Goal"
-           :in-theory (enable look-up-type-predicate)
-           :use ((:instance
-                  implies-of-type-predicate-of-term
-                  (judge (car (look-up-type-predicate
-                               term judge supertype-alst))))))))
-)
+;; (skip-proofs
+;; (defthm type-predicate-of-look-up
+;;   (implies (and (pseudo-termp term)
+;;                 (pseudo-termp judge)
+;;                 (type-to-types-alist-p supertype-alst)
+;;                 (equal (len (look-up-type-predicate term judge supertype-alst))
+;;                        1))
+;;            (and (type-predicate-of-term
+;;                  (car (look-up-type-predicate term judge supertype-alst))
+;;                  term supertype-alst)
+;;                 (consp (car (look-up-type-predicate term judge
+;;                                                     supertype-alst)))
+;;                 (symbolp (caar (look-up-type-predicate term judge
+;;                                                        supertype-alst)))))
+;;   :hints (("Goal"
+;;            :in-theory (enable look-up-type-predicate)
+;;            :use ((:instance
+;;                   implies-of-type-predicate-of-term
+;;                   (judge (car (look-up-type-predicate
+;;                                term judge supertype-alst))))))))
+;; )
 
 #|
 (look-up-type-predicate 'x
@@ -1623,4 +1623,3 @@ state)
                           (rationalp)
                           (maybe-integerp)))
 |#
-

@@ -16,9 +16,9 @@
 (include-book "tools/rewrite-dollar" :dir :system)
 
 (include-book "hint-interface")
-(include-book "ttmrg-clause")
-(include-book "term-rewrite")
-(include-book "../trusted/smt-lib")
+;;(include-book "ttmrg-clause")
+;;(include-book "term-rewrite")
+;;(include-book "../trusted/smt-lib")
 
 (defsection SMT-computed-hints
   :parents (verified)
@@ -175,10 +175,11 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
          (cp-hint-args (cadr kwd-alist))
          (next-cp (nth 0 cp-hint-args))
          (next-computed-hint (case next-cp
-                               ('term-rewrite-cp   'SMT-term-rewrite-hint)
-                               ('smtlib-trusted-cp 'SMT-expr-simplify-hint)
-                               (otherwise          'SMT-delayed-hint))))
-      (prog2$ (cw "Clause-processor ~q0" next-cp)
+                               ('type-judge-bottom-up-cp 'smt-type-judge-bottom-up-hint)
+                               ('term-rewrite-cp         'SMT-term-rewrite-hint)
+                               ('smtlib-trusted-cp       'SMT-expr-simplify-hint)
+                               (otherwise                'SMT-delayed-hint))))
+      (prog2$ (cw "Clause-processor ~q0~%" next-cp)
               `(:computed-hint-replacement
                 ((,next-computed-hint clause ',kwd-alist state))
                 :clause-processor (remove-hint-please clause)))))
@@ -188,7 +189,7 @@ allowing the user to use Smtlink inside of a Smtlink proof.</p>
     :short "@('SMT::SMT-delayed-hint') applies the hints @('kwd-alist') and
     install the @(tsee SMT::SMT-computed-hint) back."
     (declare (ignore cl))
-    (prog2$ (cw "SMT-delayed-hint")
+    (prog2$ (cw "SMT-delayed-hint~%")
             (value `(:computed-hint-replacement ((SMT-computed-hint clause))
                      ,@kwd-alist))))
 

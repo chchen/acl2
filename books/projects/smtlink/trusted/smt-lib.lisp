@@ -297,7 +297,7 @@
                   (value nil)))
          ((list* cp-kwd (list next-cp & q-smt-hint &) kwd-alist-tail) kwd-alist)
          ((unless (equal cp-kwd :clause-processor))
-          (prog2$ (cw "SMT-expr-simplify-hint: missing clause processor in kwd-alist: ~x0"
+          (prog2$ (cw "SMT-expr-simplify-hint: missing clause processor in kwd-alist: ~x0~%"
                       kwd-alist)
                   (value nil)))
          ((unless (and (quotep q-smt-hint)
@@ -307,7 +307,7 @@
          (smt-hint (unquote q-smt-hint))
          (goal (disjoin cl))
          ((mv fail smt-j) (smt-judgement-clause->judgement goal))
-         ((if fail) (prog2$ (cw "not a smt-judgement-clause: ~x0" smt-j)
+         ((if fail) (prog2$ (cw "not a smt-judgement-clause: ~x0~%" smt-j)
                             (value nil)))
          (j-expr (smt-judgement->expr smt-j))
          (expr (smt-judgement-clause->expr goal))
@@ -317,7 +317,7 @@
                            '(theory 'minimal-theory)
                            state))
          ((if fail) (value nil)))
-      (prog2$ (cw "SMT-expr-simplify-hint orig: ~x0 new: ~x1"
+      (prog2$ (cw "SMT-expr-simplify-hint orig: ~x0 new: ~x1~%"
                   expr
                   new-expr)
               (value `(:computed-hint-replacement ((SMT-computed-hint clause))
@@ -358,7 +358,7 @@
          ((unless (member (get-serialize-character state)
                           '(nil #\Y #\Z)))
           (check-sat-error "assert-serialize-character" nil state))
-         (- (cw "writing ~x0 to ~x1" script file-name))
+         (- (cw "writing ~x0 to ~x1~%" script file-name))
          ((mv erp state)
           (acl2::write-objects-to-file! script
                                         file-name
