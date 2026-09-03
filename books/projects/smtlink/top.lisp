@@ -29,6 +29,7 @@
 ;; (include-book "verified/type-extract")
 ;;(include-book "verified/alist/alist-macro")
 ;;(include-book "verified/alist/define-nonexist")
+(include-book "verified/alist/nat-sym")
 
 ;; trusted
 ;; (include-book "trusted/prove")
