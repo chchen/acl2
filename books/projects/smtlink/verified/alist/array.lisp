@@ -70,12 +70,12 @@
     :enabled t
     (cons nil default-value)))
 
-  (local (define ua-store ((i acl2::any-p) (e acl2::any-p) (ua ua-p))
+  (local (define ua-store ((ua ua-p) (i acl2::any-p) (e acl2::any-p))
     :enabled t
     (let ((ua (ua-fix ua)))
       (cons (acons i e (car ua)) (cdr ua)))))
 
-  (local (define ua-select ((i acl2::any-p) (ua ua-p))
+  (local (define ua-select ((ua ua-p) (i acl2::any-p))
     :enabled t
     (let ((ua (ua-fix ua))
 	  (a  (assoc-equal i (car ua))))
@@ -86,26 +86,26 @@
   ; The theorems that create the constraints on the functions in our signature
   (defthm ua-p-of-ua-init (ua-p (ua-init v0)))
 
-  (defthm ua-p-of-ua-store (ua-p (ua-store i v ua)))
+  (defthm ua-p-of-ua-store (ua-p (ua-store ua i v)))
 
   (defthm ua-get-default-element-of-ua-init
     (equal (ua-get-default-element (ua-init v0)) v0))
 
   (defthm ua-get-default-element-of-ua-store
     (implies (ua-p ua)
-             (equal (ua-get-default-element (ua-store i v ua))
+             (equal (ua-get-default-element (ua-store ua i v))
 		    (ua-get-default-element ua))))
 
-  (defthm ua-select-of-ua-init (equal (ua-select i (ua-init v)) v))
+  (defthm ua-select-of-ua-init (equal (ua-select (ua-init v) i) v))
 
   (defthm ua-select-of-ua-store-when-indices-equal
     (implies (ua-p ua)
-	     (equal (ua-select i (ua-store i v0 ua)) v0)))
+	     (equal (ua-select (ua-store ua i v0) i) v0)))
 
   (defthm ua-select-of-ua-store-when-indices-not-equal
     (implies (and (ua-p ua) (not (equal i1 i0)))
-	     (equal (ua-select i1 (ua-store i0 v0 ua))
-		    (ua-select i1 ua)))))
+	     (equal (ua-select (ua-store ua i0 v0) i1)
+		    (ua-select ua i1)))))
 
 (encapsulate
   ; A model of arrays where indices are recognized by ta-index-p, and
@@ -138,21 +138,21 @@
     (declare (xargs :verify-guards t))
     (forall i
 	    (and (ua-p ta)
-		 (ta-element-p (ua-select i ta))))))
+		 (ta-element-p (ua-select ta i))))))
 
   (local (define ta-init ((v0 ta-element-p))
     (ua-init (ta-element-fix v0))
     ///
     (in-theory (disable (:e ta-init)))))
 
-  (local (define ta-store ((i ta-index-p) (v ta-element-p) (ta ta-p))
+  (local (define ta-store ((ta ta-p) (i ta-index-p) (v ta-element-p))
     (if (and (ta-index-p i) (ta-element-p v) (ta-p ta))
-      (ua-store i v ta)
+      (ua-store ta i v)
       (ta-init (ta-element-default)))))
 
-  (local (define ta-select ((i ta-index-p) (ta ta-p))
+  (local (define ta-select ((ta ta-p) (i ta-index-p))
     (if (and (ta-index-p i) (ta-p ta))
-      (ua-select i ta)
+      (ua-select ta i)
       (ta-element-default))))
 
 
@@ -173,31 +173,31 @@
     :hints(("Goal" :in-theory (enable ta-init))))
 
   (defthm ta-p-of-ta-store
-    (ta-p (ta-store i v ta))
+    (ta-p (ta-store ta i v))
     :hints(("Goal"
       :in-theory (e/d (ta-store)
 		      (ua-select-of-ua-store-when-indices-not-equal
 		       ta-p-necc))
-      :cases ((equal (ta-p-witness (ua-store i v ta)) i))
+      :cases ((equal (ta-p-witness (ua-store ta i v)) i))
       :use(
 	(:instance ua-select-of-ua-store-when-indices-not-equal
-		   (i0 i) (v0 v) (i1 (ta-p-witness (ua-store i v ta))) (ua ta))
-	(:instance ta-p-necc (i (ta-p-witness (ua-store i v ta))))))))
+		   (i0 i) (v0 v) (i1 (ta-p-witness (ua-store ta i v))) (ua ta))
+	(:instance ta-p-necc (i (ta-p-witness (ua-store ta i v))))))))
 
   (defthm ta-element-p-of-ta-select
-    (ta-element-p (ta-select i ta))
+    (ta-element-p (ta-select ta i))
     :hints(("Goal"
       :in-theory (e/d (ta-select) (ta-p-necc))
       :use((:instance ta-p-necc)))))
 
   (defthm ta-select-of-ta-init
     (implies (and (ta-index-p i) (ta-element-p v))
-	     (equal (ta-select i (ta-init v)) v))
+	     (equal (ta-select (ta-init v) i) v))
     :hints(("Goal" :in-theory (enable ta-select ta-init))))
 
   (local (defthm ta-select-of-ta-store-when-indices-equal
     (implies (and (ta-p ta) (ta-index-p i) (ta-element-p v))
-	     (equal (ta-select i (ta-store i v ta)) v))
+	     (equal (ta-select (ta-store ta i v) i) v))
     :hints(("Goal"
       :in-theory (e/d (ta-select ta-store) (ta-p-of-ta-store))
       :use((:instance ta-p-of-ta-store))))))
@@ -205,15 +205,15 @@
   (local (defthm ta-select-of-ta-store-when-indices-not-equal
     (implies (and (ta-p ta) (ta-index-p i0) (ta-element-p v0)
 		  (not (equal i1 i0)))
-	     (equal (ta-select i1 (ta-store i0 v0 ta))
-		    (ta-select i1 ta)))
+	     (equal (ta-select (ta-store ta i0 v0) i1)
+		    (ta-select ta i1)))
     :hints(("Goal"
       :in-theory (e/d (ta-select ta-store) (ta-p-of-ta-store))
       :use((:instance ta-p-of-ta-store (i i0) (v v0)))))))
 
   (defthm ta-select-of-ta-store
     (implies (and (ta-p ta) (ta-index-p i0) (ta-element-p v0))
-	     (equal (ta-select i1 (ta-store i0 v0 ta))
+	     (equal (ta-select (ta-store ta i0 v0) i1)
 		    (if (equal i1 i0)
 		        v0
-		        (ta-select i1 ta))))))
+		        (ta-select ta i1))))))

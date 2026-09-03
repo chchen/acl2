@@ -34,27 +34,28 @@
     :returns (ok)
     (forall (k)
       (and (ua-p ar)
-	   (mkvp (ua-select k ar)))))
+	   (mkvp (ua-select ar k)))))
+
   (define ar-kv-init ()
     (ua-init nil)
     ///
     (in-theory (disable (:e ar-kv-init))))
 
-  (define ar-kv-store ((k kp) (kv mkvp) (ar ar-kv-p))
+  (define ar-kv-store ((ar ar-kv-p) (k kp) (kv mkvp))
     :verify-guards nil
     (if (and (kp k) (mkvp kv) (ar-kv-p ar))
-	(ua-store k kv ar)
+	(ua-store ar k kv)
 	(ar-kv-init)))
 
   (define ar-kv-from-al ((al kvap))
     :verify-guards nil
     (if (and (consp al) (kvp (car al)))
-      (ar-kv-store (caar al) (car al) (ar-kv-from-al (cdr al)))
+      (ar-kv-store (ar-kv-from-al (cdr al)) (caar al) (car al))
       (ar-kv-init)))
 
-  (define ar-kv-select ((k kp) (ar ar-kv-p))
+  (define ar-kv-select ((ar ar-kv-p) (k kp))
     (if (ar-kv-p ar)
-	(ua-select k ar)
+	(ua-select ar k)
 	nil))
 
   (acl2::define-sk ar-kv-equiv (al ar)
@@ -63,8 +64,7 @@
     (forall (k)
 	    (and (kvap al)
 		 (ar-kv-p ar)
-		 (equal (assoc-equal k al) (ar-kv-select k ar)))))
-
+		 (equal (assoc-equal k al) (ar-kv-select ar k)))))
 
   ;; Rather than writing the long functional instantiation hint for each of the
   ;; theorems below, I'll wrap it up with a macro.
@@ -142,13 +142,13 @@
       :hints(("Goal" :in-theory '(ar-kv-p-necc)))))
 
     (local (defthm fi-ar-kv-p-2
-      (implies (ar-kv-p ar) (mkvp (ua-select k ar)))
+      (implies (ar-kv-p ar) (mkvp (ua-select ar k)))
       :hints(("Goal" :in-theory '(ar-kv-p-necc)))))
 
     (local (defthm fi-ar-kv-p-3
       (implies (ua-p ar)
 	       (equal (ar-kv-p ar)
-		      (mkvp (ua-select (ar-kv-p-witness ar) ar))))
+		      (mkvp (ua-select ar (ar-kv-p-witness ar)))))
       :hints(("Goal" :in-theory '(ar-kv-p)))))
 
    (fi-thm booleanp-of-ar-kv-p
@@ -160,7 +160,7 @@
     ar-p-of-ar-init '(ar-kv-init))
 
   (fi-thm ar-kv-p-of-ar-kv-store
-    (ar-kv-p (ar-kv-store k kv ar))
+    (ar-kv-p (ar-kv-store ar k kv))
     ar-p-of-ar-store '(ar-kv-store))
 
   (verify-guards ar-kv-store)
@@ -174,20 +174,20 @@
       :in-theory '(ar-kv-p-of-ar-kv-from-al kvap mkvp kvp))))
 
   (fi-thm mkvp-of-ar-kv-select
-    (mkvp (ar-kv-select k ar))
+    (mkvp (ar-kv-select ar k))
     ar-maybe-key-val-consp-of-ar-select '(ar-kv-select))
 
   ;; init select and store behave like they should for arrays
   (fi-thm ar-kv-select-of-ar-kv-init
-    (equal (ar-kv-select k (ar-kv-init)) nil)
+    (equal (ar-kv-select (ar-kv-init) k) nil)
     ar-select-of-ar-init)
 
   (fi-thm ar-kv-select-of-ar-kv-store
     (implies (and (ar-kv-p ar) (kp k0) (mkvp kv0))
-	     (equal (ar-kv-select k1 (ar-kv-store k0 kv0 ar))
+	     (equal (ar-kv-select (ar-kv-store ar k0 kv0) k1)
 		    (if (equal k1 k0)
 		      kv0
-		      (ar-kv-select k1 ar))))
+		      (ar-kv-select ar k1))))
     ar-select-of-ar-store)
 
 
@@ -202,7 +202,7 @@
 
     (local (defthm fi-ar-kv-equiv-2
       (implies (ar-kv-equiv al ar)
-	       (equal (assoc-equal k al) (ar-kv-select k ar)))
+	       (equal (assoc-equal k al) (ar-kv-select ar k)))
       :hints(("Goal" :in-theory '(ar-kv-equiv-necc)))))
 
     (local (defthm fi-ar-kv-equiv-3
@@ -214,7 +214,7 @@
       (implies (and (kvap al)
 		    (ar-kv-p ar)
 		    (equal (assoc-equal (ar-kv-equiv-witness al ar) al)
-			   (ar-kv-select (ar-kv-equiv-witness al ar) ar)))
+			   (ar-kv-select ar (ar-kv-equiv-witness al ar))))
 	       (equal (ar-kv-equiv al ar) t))
       :hints(("Goal" :in-theory '(ar-kv-equiv)))))
 
@@ -231,7 +231,7 @@
     (implies (and (ar-kv-equiv al ar)
 		  (kp k)
 		  (vp v))
-	     (ar-kv-equiv (cons (cons k v) al) (ar-kv-store k (cons k v) ar)))
+	     (ar-kv-equiv (cons (cons k v) al) (ar-kv-store ar k (cons k v))))
     ar-translation-of-acons)
 
   (fi-thm ar-kv-translation-of-alist
@@ -240,21 +240,21 @@
 
   (fi-thm ar-kv-translation-of-assoc-equal
     (implies (ar-kv-equiv al ar)
-	     (equal (assoc-equal k al) (ar-kv-select k ar)))
+	     (equal (assoc-equal k al) (ar-kv-select ar k)))
     ar-translation-of-assoc-equal)
 
   (fi-thm ar-kv-top-down-translation-of-assoc-equal
           (implies (kvap al)
                    (equal (assoc-equal k al)
-                          (ar-kv-select k
-                                        (ar-kv-from-al al))))
+                          (ar-kv-select (ar-kv-from-al al)
+                                        k)))
           ar-top-down-translation-of-assoc-equal)
 
   (fi-thm ar-kv-top-down-translation-of-acons
           (implies (and (kp k)
                         (vp v))
                    (equal (ar-kv-from-al (cons (cons k v) al))
-                          (ar-kv-store k (cons k v) (ar-kv-from-al al))))
+                          (ar-kv-store (ar-kv-from-al al) k (cons k v))))
           ar-top-down-translation-of-acons)
 
   (fi-thm ar-kv-top-down-translation-of-nil
@@ -327,9 +327,9 @@
 
   (local (defun nat-sym-array-p (ar) (ar-kv-p ar)))
   (local (defun nat-sym-array-init () (ar-kv-init)))
-  (local (defun nat-sym-array-store (k kv ar) (ar-kv-store k kv ar)))
+  (local (defun nat-sym-array-store (ar k kv) (ar-kv-store ar k kv)))
   (local (defun nat-sym-array-from-al (al) (ar-kv-from-al al)))
-  (local (defun nat-sym-array-select (k ar) (ar-kv-select k ar)))
+  (local (defun nat-sym-array-select (ar k) (ar-kv-select ar k)))
   (local (defun nat-sym-array-equiv (al ar) (ar-kv-equiv al ar)))
 
   ;; return type constraints
@@ -345,7 +345,7 @@
       :in-theory '(nat-sym-array-init nat-sym-array-p ar-kv-p-of-ar-kv-init))))
 
   (defthmd nat-sym-array-p-of-nat-sym-array-store
-    (nat-sym-array-p (nat-sym-array-store k kv ar))
+    (nat-sym-array-p (nat-sym-array-store ar k kv))
     :hints(("Goal"
       :in-theory '(nat-sym-array-store nat-sym-array-p ar-kv-p-of-ar-kv-store))))
 
@@ -355,7 +355,7 @@
       :in-theory '(nat-sym-array-from-al nat-sym-array-p ar-kv-p-of-ar-kv-from-al))))
 
   (defthmd maybe-nat-sym-cons-of-nat-sym-array-select
-    (maybe-nat-sym-consp (nat-sym-array-select k ar))
+    (maybe-nat-sym-consp (nat-sym-array-select ar k))
     :hints(("Goal"
       :in-theory '(nat-sym-array-select maybe-nat-sym-consp-equals-mkvp mkvp-of-ar-kv-select))))
 
@@ -366,17 +366,17 @@
 
   ;; array operation constraints
   (defthmd nat-sym-array-select-of-nat-sym-array-init
-    (equal (nat-sym-array-select k (nat-sym-array-init)) nil)
+    (equal (nat-sym-array-select (nat-sym-array-init) k) nil)
     :hints(("Goal"
       :in-theory '(nat-sym-array-select nat-sym-array-init natp-equals-kp)
       :use((:instance ar-kv-select-of-ar-kv-init)))))
 
   (defthmd nat-sym-array-select-of-nat-sym-array-store
     (implies (and (nat-sym-array-p ar) (natp k0) (maybe-nat-sym-consp kv0))
-	     (equal (nat-sym-array-select k1 (nat-sym-array-store k0 kv0 ar))
+	     (equal (nat-sym-array-select (nat-sym-array-store ar k0 kv0) k1)
 		    (if (equal k1 k0)
 			kv0
-			(nat-sym-array-select k1 ar))))
+			(nat-sym-array-select ar k1))))
     :hints(("Goal"
       :in-theory '(nat-sym-array-select nat-sym-array-store nat-sym-array-p
 		   natp-equals-kp maybe-nat-sym-consp-equals-mkvp)
@@ -401,7 +401,7 @@
 		  (natp k)
 		  (symbolp v))
 	     (nat-sym-array-equiv (cons (cons k v) al)
-				  (nat-sym-array-store k (cons k v) ar)))
+				  (nat-sym-array-store ar k (cons k v))))
     :hints(("Goal" :in-theory '(
       natp-equals-kp symbolp-equals-vp nat-sym-alist-p-equals-kvap
       nat-sym-array-p nat-sym-array-equiv nat-sym-array-store
@@ -409,7 +409,7 @@
 
   (defthmd nat-sym-translation-of-assoc-equal
     (implies (nat-sym-array-equiv al ar)
-	     (equal (assoc-equal k al) (nat-sym-array-select k ar)))
+	     (equal (assoc-equal k al) (nat-sym-array-select ar k)))
     :hints(("Goal" :in-theory '(
       nat-sym-consp-equals-kvp nat-sym-alist-p-equals-kvap natp-equals-kp
       nat-sym-array-p nat-sym-array-equiv nat-sym-array-select
@@ -418,9 +418,8 @@
   (defthmd nat-sym-top-down-translation-of-assoc-equal
     (implies (nat-sym-alist-p al)
              (equal (assoc-equal k al)
-                    (nat-sym-array-select k
-                                          (nat-sym-array-from-al
-                                            al))))
+                    (nat-sym-array-select (nat-sym-array-from-al al)
+                                          k)))
     :hints (("Goal"
               :in-theory '(natp-equals-kp
                            symbolp-equals-vp
@@ -433,9 +432,9 @@
     (implies (and (natp k)
                   (symbolp v))
              (equal (nat-sym-array-from-al (cons (cons k v) al))
-                    (nat-sym-array-store k
-                                         (cons k v)
-                                         (nat-sym-array-from-al al))))
+                    (nat-sym-array-store (nat-sym-array-from-al al)
+                                         k
+                                         (cons k v))))
     :hints (("Goal"
               :in-theory '(natp-equals-kp
                            symbolp-equals-vp

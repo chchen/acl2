@@ -69,7 +69,7 @@
 (acl2::define-sk ar-p (ar)
   (forall (k)
     (and (ua-p ar)
-         (ar-maybe-key-val-consp (ua-select k ar))))
+         (ar-maybe-key-val-consp (ua-select ar k))))
   ///
   (local (in-theory (enable ar-p)))
   (defthm ua-p-when-ar-p (implies (ar-p ar) (ua-p ar)))
@@ -82,27 +82,27 @@
   (in-theory (disable (:e ar-init)))
   (more-returns (ar (ar-p ar) :name ar-p-of-ar-init)))
 
-(define ar-store ((k ar-key-p) (kv ar-maybe-key-val-consp) (ar ar-p))
+(define ar-store ((ar ar-p) (k ar-key-p) (kv ar-maybe-key-val-consp))
   :returns (ar2 ar-p
     :hints(("Goal"
-      :cases ((equal (ar-p-witness (ua-store k kv ar)) k))
+      :cases ((equal (ar-p-witness (ua-store ar k kv)) k))
       :in-theory (e/d (ar-p) (ar-p-necc))
-      :use((:instance ar-p-necc (k (ar-p-witness (ua-store k kv ar))))))))
+      :use((:instance ar-p-necc (k (ar-p-witness (ua-store ar k kv))))))))
   (if (and (ar-key-p k) (ar-maybe-key-val-consp kv) (ar-p ar))
-    (ua-store k kv ar)
+    (ua-store ar k kv)
     (ar-init)))
 
-(define ar-select ((k ar-key-p) (ar ar-p))
+(define ar-select ((ar ar-p) (k ar-key-p))
   :returns (kv ar-maybe-key-val-consp)
   (if (ar-p ar)
-    (ua-select k ar)
+    (ua-select ar k)
     nil))
 
 (define ar-from-al ((al ar-key-val-alist-p)) ;; convert an alist to an array
   :returns (ar ar-p)
   :verify-guards nil
   (if (and (consp al) (ar-key-val-consp (car al)))
-    (ar-store (caar al) (car al) (ar-from-al (cdr al)))
+    (ar-store (ar-from-al (cdr al)) (caar al) (car al))
     (ar-init))
   ///
   (verify-guards ar-from-al ;; needs ar-p-of-ar-from-al
@@ -110,12 +110,12 @@
 
 
 (defthm ar-select-of-ar-init
-  (equal (ar-select k (ar-init)) nil)
+  (equal (ar-select (ar-init) k) nil)
   :hints(("Goal" :in-theory (enable (:d ar-init) ar-select))))
 
 (local (defthm ar-select-of-ar-store-when-keys-equal
   (implies (and (ar-p ar) (ar-key-p k) (ar-maybe-key-val-consp kv))
-	   (equal (ar-select k (ar-store k kv ar)) kv))
+	   (equal (ar-select (ar-store ar k kv) k) kv))
   :hints(("Goal"
     :in-theory (e/d (ar-select ar-store) ())
     :use((:instance ar-p-of-ar-store))))))
@@ -123,18 +123,18 @@
 (local (defthm ar-select-of-ar-store-when-keys-not-equal
   (implies (and (ar-p ar) (ar-key-p k0) (ar-maybe-key-val-consp kv0)
 		(not (equal k1 k0)))
-	   (equal (ar-select k1 (ar-store k0 kv0 ar))
-		  (ar-select k1 ar)))
+	   (equal (ar-select (ar-store ar k0 kv0) k1)
+		  (ar-select ar k1)))
   :hints(("Goal"
     :in-theory (e/d (ar-select ar-store) (ar-p-of-ar-store))
     :use((:instance ar-p-of-ar-store (k k0) (kv kv0)))))))
 
 (defthm ar-select-of-ar-store
   (implies (and (ar-p ar) (ar-key-p k0) (ar-maybe-key-val-consp kv0))
-	   (equal (ar-select k1 (ar-store k0 kv0 ar))
+	   (equal (ar-select (ar-store ar k0 kv0) k1)
 		  (if (equal k1 k0)
 		      kv0
-		      (ar-select k1 ar)))))
+		      (ar-select ar k1)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -147,7 +147,7 @@
   (forall (k)        ;; assoc-equal match even for "bad" keys.
     (and (ar-key-val-alist-p al)
 	 (ar-p ar)
-	 (equal (assoc-equal k al) (ar-select k ar)))))
+	 (equal (assoc-equal k al) (ar-select ar k)))))
 
 (defthm ar-translation-of-nil
   (ar-equiv nil (ar-init))
@@ -157,14 +157,14 @@
   (implies (and (ar-equiv al ar)
 		(ar-key-p k)
 		(ar-val-p v))
-	   (ar-equiv (cons (cons k v) al) (ar-store k (cons k v) ar)))
+	   (ar-equiv (cons (cons k v) al) (ar-store ar k (cons k v))))
   :hints(("Goal"
     :do-not-induct t
     :in-theory (e/d (ar-equiv ar-key-val-consp ar-key-val-alist-p)
 		    (ar-equiv-necc))
     :use((:instance ar-equiv-necc
 		    (k (ar-equiv-witness (cons (cons k v) al)
-					 (ar-store k (cons k v) ar))))))))
+					 (ar-store ar k (cons k v)))))))))
 
 (encapsulate ()
   (local (defthm lemma-base
@@ -185,7 +185,7 @@
              (implies (and (consp al)
 		           (ar-equiv (cdr al) ar-cdr)
 		           (ar-key-val-alist-p al))
-	              (ar-equiv al (ar-store (caar al) (car al) ar-cdr))))
+	              (ar-equiv al (ar-store ar-cdr (caar al) (car al)))))
            :hints(("Goal"
                     :in-theory (e/d (ar-key-val-consp)
 		                    (ar-translation-of-acons lemma-induct-lemma))
@@ -204,7 +204,7 @@
 
   (defthmd ar-translation-of-assoc-equal
     (implies (ar-equiv al ar)
-	     (equal (assoc-equal k al) (ar-select k ar)))
+	     (equal (assoc-equal k al) (ar-select ar k)))
     :hints(("Goal"
              :in-theory (e/d (ar-equiv ar-select) (ar-equiv-necc))
              :use((:instance ar-equiv-necc)))))
@@ -212,8 +212,8 @@
   (defthmd ar-top-down-translation-of-assoc-equal
     (implies (ar-key-val-alist-p al)
              (equal (assoc-equal k al)
-                    (ar-select k
-                               (ar-from-al al))))
+                    (ar-select (ar-from-al al)
+                               k)))
     :hints (("Goal"
               :in-theory (e/d (ar-equiv-necc)
                               (ar-translation-of-alist))
@@ -223,7 +223,7 @@
     (implies (and (ar-key-p k)
                   (ar-val-p v))
              (equal (ar-from-al (cons (cons k v) al))
-                    (ar-store k (cons k v) (ar-from-al al))))
+                    (ar-store (ar-from-al al) k (cons k v))))
     :hints (("Goal"
               :in-theory (enable ar-from-al
                                  ar-key-val-consp))))
