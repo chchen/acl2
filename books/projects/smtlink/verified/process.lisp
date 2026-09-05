@@ -2044,7 +2044,8 @@
 (define find-global-hint ((user-hint smtlink-hint-syntax-p)
                           state)
   :returns (name smtlink-hint-p)
-  (b* ((user-hint (smtlink-hint-syntax-fix user-hint))
+  (b* ((- (cw "find-global-hint ~x0~%" user-hint))
+       (user-hint (smtlink-hint-syntax-fix user-hint))
        (the-hint (find-global-hint-helper user-hint))
        ((if (null the-hint))
         (prog2$ (cw "Using :default smtlink-hint from state table ~p0~%"

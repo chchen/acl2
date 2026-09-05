@@ -29,7 +29,7 @@
 ; We don't need to have pseudo-termp enabled, and enabling it drastically
 ; slows down certifying or loading this book.
 (local (in-theory (disable pseudo-termp)))
- 
+
 (fty::defalist nat-ttmrg-alist
   :key-type natp
   :val-type ttmrg-p
@@ -86,7 +86,7 @@
     :returns (nothing null)
     (show-ttermx tterm ""))
 
-	
+
   (define flatten-tr (x acc)
     :returns (flat acl2::any-p)
     (if (consp x)
@@ -402,7 +402,7 @@ instance of a sub-expression."
 	       :next-index (1+ acc-x.next-index)
 	       :j-alist (hons-acons acc-x.next-index new-tt acc-x.j-alist))))
 	(mv new-tt new-acc)))
-		
+
     (define proto-judgements-guts
 	((guts ttmrg-guts-p)  (acc proto-judge-acc-p))
       :returns (mv (new-guts ttmrg-guts-p) (new-acc proto-judge-acc-p))
@@ -413,7 +413,7 @@ instance of a sub-expression."
 	(ttmrg-guts-case guts
 	   :var (mv guts acc0)
 	   :quote (mv guts acc0)
-	   :if 
+	   :if
 	     (b* (((mv new-condx acc1)
 		   (proto-judgements-term guts.condx acc0))
 		  ((mv new-thenx acc2)
@@ -423,7 +423,7 @@ instance of a sub-expression."
 	      (mv (change-ttmrg-guts-if guts
 		    :condx new-condx :thenx new-thenx :elsex new-elsex)
 		  acc3))
-	   :fncall 
+	   :fncall
 	     (b* (((mv new-args acc1)
 		   (proto-judgements-list guts.args acc0)))
 	       (mv (change-ttmrg-guts-fncall guts :args new-args)
@@ -611,7 +611,7 @@ to the term."
 	    (change-ttmrg-guts-fncall guts
 	      :args (merge-judgements-args guts.args j-alist))))
     )
-	    
+
     (define merge-judgements-args ((args-proto ttmrg-list-p)
 				   (j-alist nat-ttmrg-alist-p))
       :measure (ttmrg-list-count (ttmrg-list-fix args-proto))
@@ -688,7 +688,7 @@ to the term."
                   (value nil)))
          ((list* cp-kwd (list next-cp & q-smt-hint &) kwd-alist-tail) kwd-alist)
          ((unless (equal cp-kwd :clause-processor))
-          (prog2$ (cw "smt-term-rewrite-hint: missing clause processor in kwd-alist: ~x0~%"
+          (prog2$ (cw "smt-type-judge-bottom-up-hint: missing clause processor in kwd-alist: ~x0~%"
                       kwd-alist)
                   (value nil)))
          ((unless (and (quotep q-smt-hint)
@@ -700,7 +700,7 @@ to the term."
          (goal (disjoin cl))
 	 ((mv fail tterm state) (type-inference-rw goal recognizers state))
          ((if fail) (value nil)))
-      (prog2$ (cw "smt-term-rewrite-hint~%  goal: ~x0~%  tterm: ~x1~%"
+      (prog2$ (cw "smt-type-judge-bottom-up-hint~%  goal: ~x0~%  tterm: ~x1~%"
                   goal
                   tterm)
               (value `(:computed-hint-replacement ((smt-computed-hint clause))

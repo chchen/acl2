@@ -211,8 +211,8 @@
          (next-goal `((hint-please ',next-hint) ,next-condition))
          ;; Side condition
          (side-goal (list (implies-expr next-condition expr))))
-                    (value (list next-goal
-                                 side-goal))))
+      (value (list next-goal
+                   side-goal))))
 
   (defrule correctness-of-tterm-type-extract-cp
     (implies (and (pseudo-term-listp cl)

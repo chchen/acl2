@@ -326,9 +326,10 @@
     (natp smt::x)
     (booleanp smt::x)
     (symbolp smt::x)
-    (acl2::maybe-nat-sym-consp smt::x)
-    (acl2::nat-sym-consp smt::x)
-    (acl2::nat-sym-alist-p smt::x)))
+    (maybe-nat-sym-consp smt::x)
+    (nat-sym-consp smt::x)
+    (nat-sym-alist-p smt::x)
+    (nat-sym-array-p smt::x)))
 
 
 (defval *bool-judgement*

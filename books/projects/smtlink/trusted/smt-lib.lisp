@@ -40,14 +40,16 @@
 (defconst *SMT-Sorts*
   (list (cons 'booleanp 'acl2::|Bool|)
         (cons 'integerp 'acl2::|Int|)
-        (cons 'rationalp 'acl2::|Real|)))
+        (cons 'rationalp 'acl2::|Real|)
+        (cons 'nat-sym-array-p '(acl2::|Array| acl2::natp acl2::nat-sym-consp))))
 
-;; First pass: only functions that occur in translated ters
+;; First pass: only functions that occur in translated terms
 (defconst *SMT-Core*
   (list (cons 'not 'acl2::|not|)
         (cons 'implies 'acl2::|=>|)
         (cons 'xor 'acl2::|xor|)
         (cons '= 'acl2::|=|)
+        (cons 'equal 'acl2::|=|)
         (cons 'if 'acl2::|ite|)))
 
 ;; Only functions that occur in translated terms, so no division, etc.
@@ -58,15 +60,42 @@
         (cons 'rational-< 'acl2::|<|)
         (cons 'rational-/ 'acl2::|/|)))
 
+;; Arrays
+(defconst *SMT-ArraysEx*
+  (list (cons 'nat-sym-array-select 'acl2::|select|)
+        (cons 'nat-sym-array-store 'acl2::|store|)))
+
 (defconst *SMT-QF_UFNRA*
   (append *SMT-Core*
           *SMT-Reals*))
 
+(defconst *SMT-AUFNIRA*
+  (append *SMT-Core*
+          *SMT-Reals*
+          *SMT-ArraysEx*))
+
+(define smt-sym-declp (x)
+  :enabled t
+  :returns (rv booleanp)
+  (or (symbolp x)
+      (symbol-listp x)))
+
 (defsection smt-mapping
+
+  (define normalize-symbol (sym)
+    :returns (rv symbolp)
+    (b* ((sym (symbol-fix sym))
+         ((if (equal (acl2::symbol-package-name sym) "ACL2")) sym))
+      (intern$ (symbol-name sym) "ACL2")))
+
+  (std::defprojection normalize-symbol-list ((x symbol-listp))
+    :returns (rv symbol-listp)
+    (normalize-symbol x))
+
   (define acl2->smt-sym ((acl2-sym symbolp)
                          (sym-map alistp)
                          (err-sym symbolp))
-    :returns (rv symbolp)
+    :returns (rv smt-sym-declp)
     (b* ((acl2-sym (symbol-fix acl2-sym))
          (sym-map (acl2::alist-fix sym-map))
          (err-sym (symbol-fix err-sym))
@@ -74,31 +103,37 @@
          (smt-sym (if (null mapping)
                       acl2-sym
                     (cdr mapping)))
-         ((unless (symbolp smt-sym)) err-sym))
-      smt-sym)
+         ((unless (smt-sym-declp smt-sym)) err-sym))
+      ;; I don't like this. Because we use the object writer, package
+      ;; names get are emitted into the smt-lib script which chokes
+      ;; the solver's parser (in Z3 at least). This assumes that the
+      ;; user is calling smtlink from the "ACL2" package, which is
+      ;; kinda gross.
+      (if (symbolp smt-sym)
+          (normalize-symbol smt-sym)
+        (normalize-symbol-list smt-sym)))
     ///
     (fty::deffixequiv acl2->smt-sym))
 
   (define acl2->smt-constant ((acl2-const symbolp))
-    :returns (rv symbolp)
+    :returns (rv smt-sym-declp)
     (acl2->smt-sym acl2-const
                    *SMT-Constants*
                    '|bad-constant|))
 
   (define acl2->smt-fn ((acl2-fn symbolp))
-    :returns (rv symbolp)
+    :returns (rv smt-sym-declp)
     (acl2->smt-sym acl2-fn
-                   *SMT-QF_UFNRA*
+                   *SMT-AUFNIRA*
                    '|bad-function|))
 
   (define acl2->smt-sort ((acl2-sort symbolp))
-    :returns (rv symbolp)
+    :returns (rv smt-sym-declp)
     (acl2->smt-sym acl2-sort
                    *SMT-Sorts*
                    '|bad-sort|))
 
   (std::defprojection acl2->smt-sort-list ((x symbol-listp))
-    :returns (rv symbol-listp)
     (acl2->smt-sort x))
   )
 
@@ -128,7 +163,7 @@
 
   (define declare-sort ((x symbolp))
     (b* ((x (symbol-fix x)))
-      `(acl2::|declare-sort| ,x 0))
+      `(acl2::|declare-sort| ,(normalize-symbol x) 0))
     ///
     (fty::deffixequiv declare-sort))
 
@@ -157,7 +192,7 @@
     :returns (rv true-listp)
     :measure (acl2-count (fn-judgement-list-fix fs))
     (b* ((fs (fn-judgement-list-fix fs))
-         (theory-fns (std::alist-keys *SMT-QF_UFNRA*))
+         (theory-fns (std::alist-keys *SMT-AUFNIRA*))
          ((unless (consp fs)) nil)
          (j (car fs))
          (name (fn-judgement->name j)))
@@ -165,7 +200,7 @@
           (fn-judgements->declare-fun-list (cdr fs))
         (b* ((domain (fn-judgement->domain j))
              (range (fn-judgement->range j))
-             (term `(acl2::|declare-fun| ,name
+             (term `(acl2::|declare-fun| ,(normalize-symbol name)
                                    ,(acl2->smt-sort-list domain)
                                    ,(acl2->smt-sort range)))
              ((unless (pseudo-termp term)) nil))
@@ -187,7 +222,7 @@
          (name (var-judgement->name v))
          (acl2-sort (var-judgement->judgement v))
          (smt-sort (acl2->smt-sort acl2-sort)))
-      `(acl2::|declare-const| ,name ,smt-sort))
+      `(acl2::|declare-const| ,(normalize-symbol name) ,smt-sort))
     ///
     (fty::deffixequiv var-judgement->declare-const))
 
@@ -206,7 +241,7 @@
     :returns (rv true-listp)
     (b* ((s (smt-judgement-fix s))
          (vs (smt-judgement->vars s)))
-      (cons `(acl2::|set-logic| acl2::qf_ufnra)
+      (cons `(acl2::|set-logic| acl2::aufnira)
             (append (smt-judgement->declare-sort-list s)
                     (smt-judgement->declare-fun-list s)
                     (var-judgements->declare-const-list vs))))
