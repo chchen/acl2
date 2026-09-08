@@ -41,6 +41,7 @@
   (list (cons 'booleanp 'acl2::|Bool|)
         (cons 'integerp 'acl2::|Int|)
         (cons 'rationalp 'acl2::|Real|)
+        (cons 'int-sym-array-p '(acl2::|Array| acl2::|Int| acl2::int-sym-consp))
         (cons 'nat-sym-array-p '(acl2::|Array| acl2::natp acl2::nat-sym-consp))))
 
 ;; First pass: only functions that occur in translated terms
@@ -62,7 +63,9 @@
 
 ;; Arrays
 (defconst *SMT-ArraysEx*
-  (list (cons 'nat-sym-array-select 'acl2::|select|)
+  (list (cons 'int-sym-array-select 'acl2::|select|)
+        (cons 'int-sym-array-store 'acl2::|store|)
+        (cons 'nat-sym-array-select 'acl2::|select|)
         (cons 'nat-sym-array-store 'acl2::|store|)))
 
 (defconst *SMT-QF_UFNRA*
