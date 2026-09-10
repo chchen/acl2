@@ -16,7 +16,6 @@
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
 (include-book "../utils/basics")
-(include-book "typed-term-fns")
 (include-book "judgement-fns")
 (include-book "lambda-substitution")
 

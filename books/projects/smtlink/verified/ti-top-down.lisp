@@ -19,10 +19,7 @@
 
 (include-book "tterm-change")
 (include-book "tterm-clause-cp")
-;;(include-book "typed-term-fns")
 (include-book "returns-judgement")
-;;(include-book "judgement-fns")
-;;(include-book "ti-bottom-up3")
 
 (set-state-ok t)
 (set-induction-depth-limit 1)
