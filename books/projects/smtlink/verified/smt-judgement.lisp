@@ -19,7 +19,7 @@
 (include-book "xdoc/top" :dir :system)
 
 (include-book "basics")
-(include-book "ttmrg3")
+(include-book "tterm")
 
 (set-state-ok t)
 (set-induction-depth-limit 1)

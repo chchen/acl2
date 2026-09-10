@@ -8,8 +8,8 @@
 (in-package "SMT")
 
 (include-book "basics")
-(include-book "ttmrg-clause")
-(include-book "ttmrg-triv3")
+(include-book "tterm-clause")
+(include-book "tterm-triv")
 (include-book "type-options")
 
 (set-state-ok t)
@@ -28,7 +28,7 @@
    (:type-prescription pseudo-lambdap)))))
 
 
-;; Define correctness properties for ttmrg-clause processors
+;; Define correctness properties for tterm-clause processors
 (encapsulate
     (((tterm-trans-fn * * state) => *)
      ((env-trans-fn *) => *)
@@ -36,7 +36,7 @@
 
   (local (defun tterm-trans-fn (tterm opts state)
            (declare (ignore opts state))
-           (ttmrg-fix tterm)))
+           (tterm-fix tterm)))
 
   (local (defun env-trans-fn (a)
            a))
@@ -47,21 +47,21 @@
   (defthm symbolp-of-current-cp-fn
     (symbolp (current-cp-fn)))
 
-  (defthm ttmrg-p-of-tterm-trans-fn
-    (ttmrg-p (tterm-trans-fn tterm opts state)))
+  (defthm tterm-p-of-tterm-trans-fn
+    (tterm-p (tterm-trans-fn tterm opts state)))
 
   (defthm tterm-trans-fn-preserves-expr-eval-backwards
     (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a)
-                  (ev-smtcp (ttmrg->expr (tterm-trans-fn tterm opts state))
+                  (ev-smtcp (tterm->expr (tterm-trans-fn tterm opts state))
                             (env-trans-fn a)))
-             (ev-smtcp (ttmrg->expr tterm) a)))
+             (ev-smtcp (tterm->expr tterm) a)))
 
   (defthm tterm-trans-fn-preserves-correct-p-forwards
     (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a)
-                  (ttmrg-correct-p tterm a))
-             (ttmrg-correct-p (tterm-trans-fn tterm opts state)
+                  (tterm-correct-p tterm a))
+             (tterm-correct-p (tterm-trans-fn tterm opts state)
                               (env-trans-fn a)))))
 
 
@@ -71,7 +71,7 @@
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((mv fail tterm) (ttmrg-parse-clause goal))
+       ((mv fail tterm) (tterm-parse-clause goal))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal (current-cp-fn) *SMT-architecture*)))
        ((if (null next-cp)) (mv t nil state))
@@ -79,7 +79,7 @@
        (new-tt (tterm-trans-fn tterm type-opt state))
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
-       (new-cl (ttmrg-clause new-tt))
+       (new-cl (tterm-clause new-tt))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 
@@ -109,13 +109,13 @@
        ((mv fail tterm)
         (prog2$ (cw "SMT-tterm-identity-cp goal: ~x0"
                     goal)
-                (ttmrg-parse-clause goal)))
+                (tterm-parse-clause goal)))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal 'tterm-identity *SMT-architecture*)))
        ((if (null next-cp)) (mv t nil state))
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
-       (new-cl (ttmrg-clause tterm))
+       (new-cl (tterm-clause tterm))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 

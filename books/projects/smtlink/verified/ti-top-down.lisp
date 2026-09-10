@@ -17,8 +17,8 @@
 (include-book "clause-processors/meta-extract-user" :dir :system)
 (include-book "ordinals/lexicographic-ordering-without-arithmetic" :dir :system)
 
-(include-book "ttmrg-change3")
-(include-book "ttmrg-clause-cp")
+(include-book "tterm-change")
+(include-book "tterm-clause-cp")
 ;;(include-book "typed-term-fns")
 (include-book "returns-judgement")
 ;;(include-book "judgement-fns")
@@ -278,17 +278,17 @@
 		       (judge-ev-lst lst expr a)))
       :flag list)))
 
-(define args->judgements-expr ((args ttmrg-list-p))
+(define args->judgements-expr ((args tterm-list-p))
   :returns (judge-expr pseudo-termp)
   (if (consp args)
     (and-expr
-      (and-list-expr (judge-list-flat-expr (ttmrg->judgements (car args))
-					   (ttmrg->expr (car args))))
+      (and-list-expr (judge-list-flat-expr (tterm->judgements (car args))
+					   (tterm->expr (car args))))
       (args->judgements-expr (cdr args)))
     ''t)
   ///
   (defrule ev-smtcp-of-args->judgements-expr
-    (implies (and (ttmrg-list-correct-p args a)
+    (implies (and (tterm-list-correct-p args a)
 		  (args->path-cond-ev args a))
 	     (ev-smtcp (args->judgements-expr args) a))
     :in-theory (enable args->judgements-expr args->path-cond-ev ev-and)
@@ -312,11 +312,11 @@
 	  :in-theory (enable and-list pseudo-term-ev))
 
       (defrule lemma-3
-	(let ((j (ttmrg->judgements tterm))
-	      (expr (ttmrg->expr tterm)))
+	(let ((j (tterm->judgements tterm))
+	      (expr (tterm->expr tterm)))
 	  (equal (ev-smtcp (and-list-expr (judge-list-flat-expr j expr)) a)
-		 (ttmrg->judgements-ev tterm a)))
-	:expand ((ttmrg->judgements-ev tterm a))))))
+		 (tterm->judgements-ev tterm a)))
+	:expand ((tterm->judgements-ev tterm a))))))
 
 ;; --- top-town-continues
 
@@ -345,29 +345,29 @@
   :verify-guards nil
   :well-founded-relation l<
 
-  (define top-down-args-precond-p ((args ttmrg-list-p))
-    :measure (list (ttmrg-list->expr-list-count args) 1 0)
+  (define top-down-args-precond-p ((args tterm-list-p))
+    :measure (list (tterm-list->expr-list-count args) 1 0)
     :returns (ok booleanp)
-    (b* ((args (ttmrg-list-fix args))
+    (b* ((args (tterm-list-fix args))
 	 ((if (endp args)) t)
 	 ((if (consp args))
 	  (and (top-down-precond-p (car args))
 	       (top-down-args-precond-p (cdr args)))))
       nil))
 
-  (define top-down-precond-p ((tterm ttmrg-p))
-    :measure (list (ttmrg->expr-count tterm) 2 0)
+  (define top-down-precond-p ((tterm tterm-p))
+    :measure (list (tterm->expr-count tterm) 2 0)
     :returns (ok booleanp)
-    (b* ((tterm (ttmrg-fix tterm))
-	 ((unless (set::emptyp (ttmrg->smt-judgements tterm)))
+    (b* ((tterm (tterm-fix tterm))
+	 ((unless (set::emptyp (tterm->smt-judgements tterm)))
           nil))
-      (case (ttmrg->kind tterm)
+      (case (tterm->kind tterm)
 	(:quote t)
 	(:var t)
-	(:if (and (top-down-precond-p (ttmrg->condx tterm))
-		  (top-down-precond-p (ttmrg->thenx tterm))
-		  (top-down-precond-p (ttmrg->elsex tterm))))
-	(:fncall (top-down-args-precond-p (ttmrg->args tterm))))))
+	(:if (and (top-down-precond-p (tterm->condx tterm))
+		  (top-down-precond-p (tterm->thenx tterm))
+		  (top-down-precond-p (tterm->elsex tterm))))
+	(:fncall (top-down-args-precond-p (tterm->args tterm))))))
   ///
   (verify-guards top-down-precond-p)
   (fty::deffixequiv-mutual top-down-precond-p))
@@ -377,12 +377,12 @@
   :verify-guards nil
   :well-founded-relation l<
 
-  (define top-down-args-postcond-p ((args1 ttmrg-list-p)
-			     (args2 ttmrg-list-p))
-    :measure (list (ttmrg-list->expr-list-count args1) 1 0)
+  (define top-down-args-postcond-p ((args1 tterm-list-p)
+			     (args2 tterm-list-p))
+    :measure (list (tterm-list->expr-list-count args1) 1 0)
     :returns (ok booleanp)
-    (b* ((args1 (ttmrg-list-fix args1))
-	 (args2 (ttmrg-list-fix args2))
+    (b* ((args1 (tterm-list-fix args1))
+	 (args2 (tterm-list-fix args2))
 	 ((if (and (endp args1)
 		   (endp args2)))
 	  t)
@@ -394,30 +394,30 @@
 				  (cdr args2)))))
       nil))
 
-  (define top-down-postcond-p ((tterm1 ttmrg-p)
-			(tterm2 ttmrg-p))
-    :measure (list (ttmrg->expr-count tterm1) 2 0)
+  (define top-down-postcond-p ((tt1 tterm-p)
+			(tt2 tterm-p))
+    :measure (list (tterm->expr-count tt1) 2 0)
     :returns (ok booleanp)
-    (b* ((tterm1 (ttmrg-fix tterm1))
-	 (tterm2 (ttmrg-fix tterm2))
-	 ((unless (and (ttmrg->kind-equiv tterm1 tterm2)
-		       (ttmrg->path-cond-equiv tterm1 tterm2)
-		       (ttmrg->judgements-equiv tterm1 tterm2)
-		       (set::subset (ttmrg->smt-judgements tterm2)
-				    (ttmrg->judgements tterm1))))
+    (b* ((tt1 (tterm-fix tt1))
+	 (tt2 (tterm-fix tt2))
+	 ((unless (and (tterm->kind-equiv tt1 tt2)
+		       (tterm->path-cond-equiv tt1 tt2)
+		       (tterm->judgements-equiv tt1 tt2)
+		       (set::subset (tterm->smt-judgements tt2)
+				    (tterm->judgements tt1))))
 	  nil))
-      (case (ttmrg->kind tterm1)
-	(:quote (ttmrg->val-equiv tterm1 tterm2))
-	(:var (ttmrg->name-equiv tterm1 tterm2))
-	(:if (and (top-down-postcond-p (ttmrg->condx tterm1)
-				(ttmrg->condx tterm2))
-		  (top-down-postcond-p (ttmrg->thenx tterm1)
-				(ttmrg->thenx tterm2))
-		  (top-down-postcond-p (ttmrg->elsex tterm1)
-				(ttmrg->elsex tterm2))))
-	(:fncall (and (ttmrg->f-equiv tterm1 tterm2)
-		      (top-down-args-postcond-p (ttmrg->args tterm1)
-					 (ttmrg->args tterm2)))))))
+      (case (tterm->kind tt1)
+	(:quote (tterm->val-equiv tt1 tt2))
+	(:var (tterm->name-equiv tt1 tt2))
+	(:if (and (top-down-postcond-p (tterm->condx tt1)
+				(tterm->condx tt2))
+		  (top-down-postcond-p (tterm->thenx tt1)
+				(tterm->thenx tt2))
+		  (top-down-postcond-p (tterm->elsex tt1)
+				(tterm->elsex tt2))))
+	(:fncall (and (tterm->f-equiv tt1 tt2)
+		      (top-down-args-postcond-p (tterm->args tt1)
+					 (tterm->args tt2)))))))
   ///
   (verify-guards top-down-postcond-p)
   (fty::deffixequiv-mutual top-down-postcond-p)
@@ -425,187 +425,187 @@
   (defthm-top-down-postcond-p-flag
     (defthm top-down-args-postcond-p-expr-path-equivs
       (implies (top-down-args-postcond-p args1 args2)
-	       (and (ttmrg-list->expr-list-equiv args1 args2)
-		    (ttmrg-list->path-cond-equiv args1 args2)))
+	       (and (tterm-list->expr-list-equiv args1 args2)
+		    (tterm-list->path-cond-equiv args1 args2)))
       :flag top-down-args-postcond-p
       :rule-classes :forward-chaining)
     (defthm top-down-postcond-p-expr-path-equivs
-      (implies (top-down-postcond-p tterm1 tterm2)
-	       (and (ttmrg->expr-equiv tterm1 tterm2)
-		    (ttmrg->path-cond-equiv tterm1 tterm2)))
+      (implies (top-down-postcond-p tt1 tt2)
+	       (and (tterm->expr-equiv tt1 tt2)
+		    (tterm->path-cond-equiv tt1 tt2)))
       :flag top-down-postcond-p
       :rule-classes :forward-chaining)
     :hints (("Goal"
-	      :expand ((top-down-postcond-p tterm1 tterm2)
+	      :expand ((top-down-postcond-p tt1 tt2)
 		       (top-down-args-postcond-p args1 args2))
-	      :in-theory (enable ttmrg->path-cond-equiv
-			         ttmrg->path-cond
-			         ttmrg->expr-equiv
-			         ttmrg->expr))))
+	      :in-theory (enable tterm->path-cond-equiv
+			         tterm->path-cond
+			         tterm->expr-equiv
+			         tterm->expr))))
 
   (local
    (defrule top-down-postcond-p-fncall-expr-equiv
-     (implies (and (top-down-args-postcond-p (ttmrg->args tterm1)
-				             (ttmrg->args tterm2))
-		   (ttmrg->kind-equiv tterm1 tterm2)
-		   (equal (ttmrg->kind tterm1) :fncall)
-		   (ttmrg->f-equiv tterm1 tterm2))
-	      (ttmrg->expr-equiv tterm1 tterm2))
-     :in-theory (enable ttmrg->expr-equiv
-		        ttmrg->expr)
+     (implies (and (top-down-args-postcond-p (tterm->args tt1)
+				             (tterm->args tt2))
+		   (tterm->kind-equiv tt1 tt2)
+		   (equal (tterm->kind tt1) :fncall)
+		   (tterm->f-equiv tt1 tt2))
+	      (tterm->expr-equiv tt1 tt2))
+     :in-theory (enable tterm->expr-equiv
+		        tterm->expr)
      :rule-classes :forward-chaining))
 
   (local
    (defrule top-down-postcond-p-if-expr-equiv
-    (implies (and (top-down-postcond-p (ttmrg->condx tterm1)
-				(ttmrg->condx tterm2))
-		  (top-down-postcond-p (ttmrg->thenx tterm1)
-				(ttmrg->thenx tterm2))
-		  (top-down-postcond-p (ttmrg->elsex tterm1)
-				(ttmrg->elsex tterm2))
-		  (ttmrg->kind-equiv tterm1 tterm2)
-		  (equal (ttmrg->kind tterm1) :if))
-	     (ttmrg->expr-equiv tterm1 tterm2))
-    :in-theory (enable ttmrg->expr-equiv
-		       ttmrg->expr)
+    (implies (and (top-down-postcond-p (tterm->condx tt1)
+				(tterm->condx tt2))
+		  (top-down-postcond-p (tterm->thenx tt1)
+				(tterm->thenx tt2))
+		  (top-down-postcond-p (tterm->elsex tt1)
+				(tterm->elsex tt2))
+		  (tterm->kind-equiv tt1 tt2)
+		  (equal (tterm->kind tt1) :if))
+	     (tterm->expr-equiv tt1 tt2))
+    :in-theory (enable tterm->expr-equiv
+		       tterm->expr)
     :rule-classes :forward-chaining))
 
   (local
    (defrule top-down-postcond-p-var-expr-equiv
-    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
-		  (equal (ttmrg->kind tterm1) :var)
-		  (ttmrg->name-equiv tterm1 tterm2))
-	     (ttmrg->expr-equiv tterm1 tterm2))
-    :in-theory (enable ttmrg->expr-equiv
-		       ttmrg->expr)
+    (implies (and (tterm->kind-equiv tt1 tt2)
+		  (equal (tterm->kind tt1) :var)
+		  (tterm->name-equiv tt1 tt2))
+	     (tterm->expr-equiv tt1 tt2))
+    :in-theory (enable tterm->expr-equiv
+		       tterm->expr)
     :rule-classes :forward-chaining))
 
   (local
    (defrule top-down-postcond-p-quote-expr-equiv
-    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
-		  (equal (ttmrg->kind tterm1) :quote)
-		  (ttmrg->val-equiv tterm1 tterm2))
-	     (ttmrg->expr-equiv tterm1 tterm2))
-    :in-theory (enable ttmrg->expr-equiv
-		       ttmrg->expr)
+    (implies (and (tterm->kind-equiv tt1 tt2)
+		  (equal (tterm->kind tt1) :quote)
+		  (tterm->val-equiv tt1 tt2))
+	     (tterm->expr-equiv tt1 tt2))
+    :in-theory (enable tterm->expr-equiv
+		       tterm->expr)
     :rule-classes :forward-chaining))
 
   (local
    (defrule top-down-postcond-p-smt-judgements-ev
-    (implies (and (ttmrg->judgements-ev tterm1 a)
-		  (set::subset (ttmrg->smt-judgements tterm2)
-			       (ttmrg->judgements tterm1))
-		  (ttmrg->expr-equiv tterm1 tterm2))
-	     (ttmrg->smt-judgements-ev tterm2 a))
-    :in-theory (e/d (ttmrg->judgements-ev
-		     ttmrg->smt-judgements-ev
+    (implies (and (tterm->judgements-ev tt1 a)
+		  (set::subset (tterm->smt-judgements tt2)
+			       (tterm->judgements tt1))
+		  (tterm->expr-equiv tt1 tt2))
+	     (tterm->smt-judgements-ev tt2 a))
+    :in-theory (e/d (tterm->judgements-ev
+		     tterm->smt-judgements-ev
 		     all-subset<judge-ev>)
 		    (all-strategy<judge-ev>))))
 
   (local
    (defrule top-down-postcond-p-fncall-inductive-case
-    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
-		  (ttmrg->path-cond-equiv tterm1 tterm2)
-		  (ttmrg->judgements-equiv tterm1 tterm2)
-		  (set::subset (ttmrg->smt-judgements tterm2)
-			       (ttmrg->judgements tterm1))
-		  (equal (ttmrg->kind tterm1) :fncall)
-		  (ttmrg->f-equiv tterm1 tterm2)
-		  (ttmrg-list-correct-p (ttmrg->args tterm2)
+    (implies (and (tterm->kind-equiv tt1 tt2)
+		  (tterm->path-cond-equiv tt1 tt2)
+		  (tterm->judgements-equiv tt1 tt2)
+		  (set::subset (tterm->smt-judgements tt2)
+			       (tterm->judgements tt1))
+		  (equal (tterm->kind tt1) :fncall)
+		  (tterm->f-equiv tt1 tt2)
+		  (tterm-list-correct-p (tterm->args tt2)
 					a)
-		  (ttmrg-correct-p tterm1 a)
-		  (top-down-args-postcond-p (ttmrg->args tterm1)
-				     (ttmrg->args tterm2)))
-	     (ttmrg-correct-p tterm2 a))
-    :expand ((ttmrg-correct-p tterm1 a)
-	     (ttmrg-correct-p tterm2 a))
+		  (tterm-correct-p tt1 a)
+		  (top-down-args-postcond-p (tterm->args tt1)
+				     (tterm->args tt2)))
+	     (tterm-correct-p tt2 a))
+    :expand ((tterm-correct-p tt1 a)
+	     (tterm-correct-p tt2 a))
     :in-theory (e/d (top-down-postcond-p-fncall-expr-equiv
 		     top-down-postcond-p-smt-judgements-ev)
-		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
-    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+		    (tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
 
   (local
    (defrule top-down-postcond-p-if-inductive-case
-    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
-		  (ttmrg->judgements-equiv tterm1 tterm2)
-		  (set::subset (ttmrg->smt-judgements tterm2)
-			       (ttmrg->judgements tterm1))
-		  (equal (ttmrg->kind tterm1) :if)
-		  (top-down-postcond-p (ttmrg->condx tterm1)
-				(ttmrg->condx tterm2))
-		  (top-down-postcond-p (ttmrg->thenx tterm1)
-				(ttmrg->thenx tterm2))
-		  (ttmrg-correct-p (ttmrg->condx tterm2)
+    (implies (and (tterm->kind-equiv tt1 tt2)
+		  (tterm->judgements-equiv tt1 tt2)
+		  (set::subset (tterm->smt-judgements tt2)
+			       (tterm->judgements tt1))
+		  (equal (tterm->kind tt1) :if)
+		  (top-down-postcond-p (tterm->condx tt1)
+				(tterm->condx tt2))
+		  (top-down-postcond-p (tterm->thenx tt1)
+				(tterm->thenx tt2))
+		  (tterm-correct-p (tterm->condx tt2)
 				   a)
-		  (ttmrg-correct-p (ttmrg->thenx tterm2)
+		  (tterm-correct-p (tterm->thenx tt2)
 				   a)
-		  (ttmrg-correct-p (ttmrg->elsex tterm2)
+		  (tterm-correct-p (tterm->elsex tt2)
 				   a)
-		  (ttmrg-correct-p tterm1 a)
-		  (ttmrg->path-cond-equiv tterm1 tterm2)
-		  (top-down-postcond-p (ttmrg->elsex tterm1)
-				(ttmrg->elsex tterm2)))
-	     (ttmrg-correct-p tterm2 a))
-    :expand ((ttmrg-correct-p tterm1 a)
-	     (ttmrg-correct-p tterm2 a))
+		  (tterm-correct-p tt1 a)
+		  (tterm->path-cond-equiv tt1 tt2)
+		  (top-down-postcond-p (tterm->elsex tt1)
+				(tterm->elsex tt2)))
+	     (tterm-correct-p tt2 a))
+    :expand ((tterm-correct-p tt1 a)
+	     (tterm-correct-p tt2 a))
     :in-theory (e/d (top-down-postcond-p-if-expr-equiv
 		     top-down-postcond-p-smt-judgements-ev)
-		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
-    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+		    (tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
 
   (local
    (defrule top-down-postcond-p-var-case
-    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
-		  (ttmrg->judgements-equiv tterm1 tterm2)
-		  (set::subset (ttmrg->smt-judgements tterm2)
-			       (ttmrg->judgements tterm1))
-		  (equal (ttmrg->kind tterm1) :var)
-		  (ttmrg-correct-p tterm1 a)
-		  (ttmrg->path-cond-equiv tterm1 tterm2)
-		  (ttmrg->name-equiv tterm1 tterm2))
-	     (ttmrg-correct-p tterm2 a))
-    :expand ((ttmrg-correct-p tterm1 a)
-	     (ttmrg-correct-p tterm2 a))
+    (implies (and (tterm->kind-equiv tt1 tt2)
+		  (tterm->judgements-equiv tt1 tt2)
+		  (set::subset (tterm->smt-judgements tt2)
+			       (tterm->judgements tt1))
+		  (equal (tterm->kind tt1) :var)
+		  (tterm-correct-p tt1 a)
+		  (tterm->path-cond-equiv tt1 tt2)
+		  (tterm->name-equiv tt1 tt2))
+	     (tterm-correct-p tt2 a))
+    :expand ((tterm-correct-p tt1 a)
+	     (tterm-correct-p tt2 a))
     :in-theory (e/d (top-down-postcond-p-var-expr-equiv
 		     top-down-postcond-p-smt-judgements-ev)
-		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
-    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+		    (tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
 
   (local
    (defrule top-down-postcond-p-quote-case
-    (implies (and (ttmrg->kind-equiv tterm1 tterm2)
-		  (ttmrg->judgements-equiv tterm1 tterm2)
-		  (set::subset (ttmrg->smt-judgements tterm2)
-			       (ttmrg->judgements tterm1))
-		  (equal (ttmrg->kind tterm1) :quote)
-		  (ttmrg-correct-p tterm1 a)
-		  (ttmrg->path-cond-equiv tterm1 tterm2)
-		  (ttmrg->val-equiv tterm1 tterm2))
-	     (ttmrg-correct-p tterm2 a))
-    :expand ((ttmrg-correct-p tterm1 a)
-	     (ttmrg-correct-p tterm2 a))
+    (implies (and (tterm->kind-equiv tt1 tt2)
+		  (tterm->judgements-equiv tt1 tt2)
+		  (set::subset (tterm->smt-judgements tt2)
+			       (tterm->judgements tt1))
+		  (equal (tterm->kind tt1) :quote)
+		  (tterm-correct-p tt1 a)
+		  (tterm->path-cond-equiv tt1 tt2)
+		  (tterm->val-equiv tt1 tt2))
+	     (tterm-correct-p tt2 a))
+    :expand ((tterm-correct-p tt1 a)
+	     (tterm-correct-p tt2 a))
     :in-theory (e/d (top-down-postcond-p-quote-expr-equiv
 		     top-down-postcond-p-smt-judgements-ev)
-		    (ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))
-    :use ((:instance ttmrg->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
+		    (tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))
+    :use ((:instance tterm->judgements-and-expr-equiv-when-judgements-and-expr-equal))))
 
   (defthm-top-down-postcond-p-flag
-    (defthm top-down-args-postcond-p-impl-ttmrg-list-correct-p
+    (defthm top-down-args-postcond-p-impl-tterm-list-correct-p
       (implies (top-down-args-postcond-p args1 args2)
-               (implies (ttmrg-list-correct-p args1 a)
-	                (ttmrg-list-correct-p args2 a)))
+               (implies (tterm-list-correct-p args1 a)
+	                (tterm-list-correct-p args2 a)))
       :flag top-down-args-postcond-p)
-    (defthm top-down-postcond-p-impl-ttmrg-correct-p
-      (implies (top-down-postcond-p tterm1 tterm2)
-               (implies (ttmrg-correct-p tterm1 a)
-	                (ttmrg-correct-p tterm2 a)))
+    (defthm top-down-postcond-p-impl-tterm-correct-p
+      (implies (top-down-postcond-p tt1 tt2)
+               (implies (tterm-correct-p tt1 a)
+	                (tterm-correct-p tt2 a)))
       :flag top-down-postcond-p)
     :hints (("Goal"
 	      :in-theory (enable top-down-postcond-p-fncall-inductive-case
 			         top-down-postcond-p-if-inductive-case
 			         top-down-postcond-p-var-case
 			         top-down-postcond-p-quote-case)
-	      :expand ((top-down-postcond-p tterm1 tterm2)
+	      :expand ((top-down-postcond-p tt1 tt2)
 		       (top-down-args-postcond-p args1 args2))))))
 
 
@@ -649,26 +649,26 @@
 		     (set::subset rv top))))))
 
 
-(define refine-terminal ((tterm ttmrg-p)
+(define refine-terminal ((tterm tterm-p)
                          (top judge-set-p))
-  :guard (or (equal (ttmrg->kind tterm) :quote)
-             (equal (ttmrg->kind tterm) :var))
-  :returns (rv ttmrg-p)
-  (b* ((tterm (ttmrg-fix tterm))
+  :guard (or (equal (tterm->kind tterm) :quote)
+             (equal (tterm->kind tterm) :var))
+  :returns (rv tterm-p)
+  (b* ((tterm (tterm-fix tterm))
        (top (judge-set-fix top))
-       ((unless (mbt (or (equal (ttmrg->kind tterm) :quote)
-                         (equal (ttmrg->kind tterm) :var))))
-        (make-ttmrg-trivial nil))
-       (judgements (ttmrg->judgements tterm))
+       ((unless (mbt (or (equal (tterm->kind tterm) :quote)
+                         (equal (tterm->kind tterm) :var))))
+        (make-tterm-trivial nil))
+       (judgements (tterm->judgements tterm))
        (new-judgement (refine-judgement judgements top)))
-    (ttmrg-add-smt-judge-set tterm new-judgement))
+    (tterm-add-smt-judge-set tterm new-judgement))
   ///
   (fty::deffixequiv refine-terminal)
   (more-returns
    (rv :name refine-terminal-implements-top-down-postcond-p
        (implies (and (top-down-precond-p tterm)
                   (not (equal rv
-                              (make-ttmrg-trivial nil))))
+                              (make-tterm-trivial nil))))
              (top-down-postcond-p tterm
                            (refine-terminal tterm top)))
        :hints (("Goal"
@@ -679,9 +679,9 @@
                           (refine-terminal tterm top)
                           (top-down-postcond-p
                             tterm
-                            (ttmrg-add-smt-judge-set
+                            (tterm-add-smt-judge-set
                               tterm
-                              (refine-judgement (ttmrg->judgements tterm)
+                              (refine-judgement (tterm->judgements tterm)
                                                 (judge-set-fix top))))))))))
 
 
@@ -754,77 +754,77 @@
       :induct (set::cardinality j-set)))
 
 
-  (define ttmrg-smt-judgement-expr ((tterm ttmrg-p))
+  (define tterm-smt-judgement-expr ((tterm tterm-p))
     :returns (rv pseudo-termp)
-    (b* ((tterm (ttmrg-fix tterm)))
+    (b* ((tterm (tterm-fix tterm)))
       (and-list-expr
-        (judge-list-flat-expr (ttmrg->smt-judgements tterm)
-                              (ttmrg->expr tterm))))
+        (judge-list-flat-expr (tterm->smt-judgements tterm)
+                              (tterm->expr tterm))))
     ///
-    (fty::deffixequiv ttmrg-smt-judgement-expr)
+    (fty::deffixequiv tterm-smt-judgement-expr)
     (more-returns
-     (rv :name ttmrg-smt-judgement-expr-correct
+     (rv :name tterm-smt-judgement-expr-correct
          (equal (ev-smtcp rv a)
-	        (ttmrg->smt-judgements-ev tterm a))
+	        (tterm->smt-judgements-ev tterm a))
          :hints (("Goal"
                    :in-theory (e/d () ;; (and-list-judge-ev-lst-equals-all-judge-ev)
 			           (and-list--expr/ev))
-	           :expand ((ttmrg-smt-judgement-expr tterm)
-		            (ttmrg->smt-judgements-ev tterm a))))))))
+	           :expand ((tterm-smt-judgement-expr tterm)
+		            (tterm->smt-judgements-ev tterm a))))))))
 
 
-(defines refine-ttmrg
+(defines refine-tterm
   :verify-guards nil
   :well-founded-relation l<
 
-  (define refine-if ((tterm ttmrg-p)
+  (define refine-if ((tterm tterm-p)
                      (top judge-set-p)
                      (options type-options-p)
                      state)
-    :measure (list (ttmrg->expr-count tterm) 2 0)
-    :guard (equal (ttmrg->kind tterm)
+    :measure (list (tterm->expr-count tterm) 2 0)
+    :guard (equal (tterm->kind tterm)
                   :if)
-    :returns (rv ttmrg-p)
-    (b* ((tterm (ttmrg-fix tterm))
+    :returns (rv tterm-p)
+    (b* ((tterm (tterm-fix tterm))
          (top (judge-set-fix top))
          (options (type-options-fix options))
-         ((unless (mbt (equal (ttmrg->kind tterm) :if)))
-          (make-ttmrg-trivial nil))
-         (judgements (ttmrg->judgements tterm))
+         ((unless (mbt (equal (tterm->kind tterm) :if)))
+          (make-tterm-trivial nil))
+         (judgements (tterm->judgements tterm))
          (permissible (refine-judgement judgements top))
-         (new-condx (refine-ttmrg (ttmrg->condx tterm)
+         (new-condx (refine-tterm (tterm->condx tterm)
                                   *bool-judgement*
                                   options
                                   state))
-         (new-thenx (refine-ttmrg (ttmrg->thenx tterm)
+         (new-thenx (refine-tterm (tterm->thenx tterm)
                                   permissible
                                   options
                                   state))
-         (new-elsex (refine-ttmrg (ttmrg->elsex tterm)
+         (new-elsex (refine-tterm (tterm->elsex tterm)
                                   permissible
                                   options
                                   state))
          ((if (or (equal new-condx
-                         (make-ttmrg-trivial nil))
+                         (make-tterm-trivial nil))
                   (equal new-thenx
-                         (make-ttmrg-trivial nil))
+                         (make-tterm-trivial nil))
                   (equal new-elsex
-                         (make-ttmrg-trivial nil))))
-          (make-ttmrg-trivial nil))
-         (new-guts (make-ttmrg-guts-if :condx new-condx
+                         (make-tterm-trivial nil))))
+          (make-tterm-trivial nil))
+         (new-guts (make-tterm-guts-if :condx new-condx
                                        :thenx new-thenx
                                        :elsex new-elsex)))
-      (ttmrg-add-smt-judge-set (ttmrg-change-guts tterm new-guts)
+      (tterm-add-smt-judge-set (tterm-change-guts tterm new-guts)
                                permissible)))
 
-  (define zip-refine ((tterms ttmrg-list-p)
+  (define zip-refine ((tterms tterm-list-p)
                       (tops judge-set-list-p)
                       (options type-options-p)
                       state)
-    :measure (list (ttmrg-list->expr-list-count tterms) 1 0)
+    :measure (list (tterm-list->expr-list-count tterms) 1 0)
     :returns (mv (err booleanp)
-                 (val ttmrg-list-p))
-    (b* ((tterms (ttmrg-list-fix tterms))
+                 (val tterm-list-p))
+    (b* ((tterms (tterm-list-fix tterms))
          (tops (judge-set-list-fix tops))
          (options (type-options-fix options))
          ((unless (top-down-args-precond-p tterms))
@@ -832,44 +832,44 @@
          ((unless (and (consp tterms)
                        (consp tops)))
           (mv nil nil))
-         (new-head (refine-ttmrg (car tterms) (car tops) options state))
+         (new-head (refine-tterm (car tterms) (car tops) options state))
          ((if (equal new-head
-                     (make-ttmrg-trivial nil)))
+                     (make-tterm-trivial nil)))
           (mv t nil))
          ((mv err new-tail)
           (zip-refine (cdr tterms) (cdr tops) options state))
          ((if err) (mv t nil)))
       (mv nil (cons new-head new-tail))))
 
-  (define refine-fn ((tterm ttmrg-p)
+  (define refine-fn ((tterm tterm-p)
                      (top judge-set-p)
                      (options type-options-p)
                      state)
-    :measure (list (ttmrg->expr-count tterm) 2 0)
-    :guard (equal (ttmrg->kind tterm)
+    :measure (list (tterm->expr-count tterm) 2 0)
+    :guard (equal (tterm->kind tterm)
                   :fncall)
-    :returns (rv ttmrg-p)
-    (b* ((tterm (ttmrg-fix tterm))
+    :returns (rv tterm-p)
+    (b* ((tterm (tterm-fix tterm))
          (top (judge-set-fix top))
          (options (type-options-fix options))
-         ((unless (mbt (equal (ttmrg->kind tterm) :fncall)))
-          (make-ttmrg-trivial nil))
-         ((unless (top-down-args-precond-p (ttmrg->args tterm)))
-          (make-ttmrg-trivial nil))
-         (judgements (ttmrg->judgements tterm))
+         ((unless (mbt (equal (tterm->kind tterm) :fncall)))
+          (make-tterm-trivial nil))
+         ((unless (top-down-args-precond-p (tterm->args tterm)))
+          (make-tterm-trivial nil))
+         (judgements (tterm->judgements tterm))
          (permissible (refine-judgement judgements top))
-         (tterm-new (ttmrg-add-smt-judge-set tterm permissible))
+         (tterm-new (tterm-add-smt-judge-set tterm permissible))
          ;; We construct a original-style `term substituted for variable'
          ;; judgement because of the way choose-returns works
-         (top-judgement-expr (ttmrg-smt-judgement-expr tterm-new))
-         (path-cond-expr (ttmrg->path-cond-expr tterm-new))
-         (f (ttmrg->f tterm-new))
-         (args (ttmrg->args tterm-new))
-         (args-expr (ttmrg-list->expr-list args))
+         (top-judgement-expr (tterm-smt-judgement-expr tterm-new))
+         (path-cond-expr (tterm->path-cond-expr tterm-new))
+         (f (tterm->f tterm-new))
+         (args (tterm->args tterm-new))
+         (args-expr (tterm-list->expr-list args))
          (args-judgement-exprs (args->judgements-expr args))
          (functions (type-options->functions options))
          (conspair (assoc-equal f functions))
-         ((unless conspair) (make-ttmrg-trivial nil))
+         ((unless conspair) (make-tterm-trivial nil))
          (permissible-args (choose-returns top-judgement-expr
                                            f
                                            args-expr
@@ -881,112 +881,112 @@
          (permissible-judge-sets (parse-judge-sets args-expr
                                                    permissible-args))
          ;; TODO show that the downstream functions actually preserve list length?
-         ((unless (= (len (ttmrg->args tterm))
+         ((unless (= (len (tterm->args tterm))
                      (len permissible-judge-sets)))
-          (make-ttmrg-trivial nil))
+          (make-tterm-trivial nil))
          ((mv err new-args) (zip-refine args permissible-judge-sets options state))
-         ((if err) (make-ttmrg-trivial nil))
-         (new-guts (make-ttmrg-guts-fncall :f f :args new-args)))
-      (ttmrg-add-smt-judge-set (ttmrg-change-guts tterm new-guts)
+         ((if err) (make-tterm-trivial nil))
+         (new-guts (make-tterm-guts-fncall :f f :args new-args)))
+      (tterm-add-smt-judge-set (tterm-change-guts tterm new-guts)
                                permissible)))
 
-  (define refine-ttmrg ((tterm ttmrg-p)
+  (define refine-tterm ((tterm tterm-p)
                         (top judge-set-p)
                         (options type-options-p)
                         state)
-    :measure (list (ttmrg->expr-count tterm) 3 0)
-    :returns (rv ttmrg-p)
-    (b* ((tterm (ttmrg-fix tterm))
+    :measure (list (tterm->expr-count tterm) 3 0)
+    :returns (rv tterm-p)
+    (b* ((tterm (tterm-fix tterm))
          (top (judge-set-fix top))
          (options (type-options-fix options))
          ((unless (top-down-precond-p tterm))
-          (make-ttmrg-trivial nil)))
-      (case (ttmrg->kind tterm)
+          (make-tterm-trivial nil)))
+      (case (tterm->kind tterm)
         (:quote (refine-terminal tterm top))
         (:var (refine-terminal tterm top))
         (:if (refine-if tterm top options state))
         (:fncall (refine-fn tterm top options state)))))
   ///
-  (verify-guards refine-ttmrg)
-  (fty::deffixequiv-mutual refine-ttmrg)
+  (verify-guards refine-tterm)
+  (fty::deffixequiv-mutual refine-tterm)
 
   (local
-   (defrule refine-ttmrg-fncall-inductive-case
+   (defrule refine-tterm-fncall-inductive-case
      (implies
        (and
-         (equal (ttmrg->kind tterm) :fncall)
-         (assoc-equal (ttmrg->f tterm)
+         (equal (tterm->kind tterm) :fncall)
+         (assoc-equal (tterm->f tterm)
                       (type-options->functions options))
          (top-down-args-postcond-p
-           (ttmrg->args tterm)
+           (tterm->args tterm)
            new-args)
          (top-down-precond-p tterm)
          (judge-set-p top))
        (top-down-postcond-p
          tterm
-         (ttmrg-add-smt-judge-set
-           (ttmrg-change-guts
+         (tterm-add-smt-judge-set
+           (tterm-change-guts
              tterm
-             (ttmrg-guts-fncall
-               (ttmrg->f tterm)
+             (tterm-guts-fncall
+               (tterm->f tterm)
                new-args))
-           (refine-judgement (ttmrg->judgements tterm)
+           (refine-judgement (tterm->judgements tterm)
                              top))))
-     :in-theory (enable ttmrg-change-guts
-                        ttmrg-add-smt-judge-set)
+     :in-theory (enable tterm-change-guts
+                        tterm-add-smt-judge-set)
      :expand ((top-down-precond-p tterm)
               (top-down-postcond-p tterm
-                                   (ttmrg (ttmrg->path-cond tterm)
-                                          (ttmrg->judgements tterm)
-                                          (refine-judgement (ttmrg->judgements tterm)
+                                   (tterm (tterm->path-cond tterm)
+                                          (tterm->judgements tterm)
+                                          (refine-judgement (tterm->judgements tterm)
                                                             top)
-                                          (ttmrg-guts-fncall (ttmrg->f tterm)
+                                          (tterm-guts-fncall (tterm->f tterm)
                                                              new-args))))))
 
   (local
-   (defrule refine-ttmrg-if-inductive-case
+   (defrule refine-tterm-if-inductive-case
      (implies
-       (and (equal (ttmrg->kind tterm) :if)
-            (top-down-postcond-p (ttmrg->condx tterm)
+       (and (equal (tterm->kind tterm) :if)
+            (top-down-postcond-p (tterm->condx tterm)
                                  new-condx)
-            (top-down-postcond-p (ttmrg->thenx tterm)
+            (top-down-postcond-p (tterm->thenx tterm)
                                  new-thenx)
-            (top-down-postcond-p (ttmrg->elsex tterm)
+            (top-down-postcond-p (tterm->elsex tterm)
                                  new-elsex)
             (top-down-precond-p tterm)
             (judge-set-p top))
        (top-down-postcond-p
          tterm
-         (ttmrg-add-smt-judge-set
-           (ttmrg-change-guts
+         (tterm-add-smt-judge-set
+           (tterm-change-guts
              tterm
-             (ttmrg-guts-if new-condx
+             (tterm-guts-if new-condx
                             new-thenx
                             new-elsex))
-           (refine-judgement (ttmrg->judgements tterm)
+           (refine-judgement (tterm->judgements tterm)
                              top))))
-     :in-theory (enable ttmrg-change-guts
-                        ttmrg-add-smt-judge-set)
+     :in-theory (enable tterm-change-guts
+                        tterm-add-smt-judge-set)
      :expand ((top-down-precond-p tterm)
               (top-down-postcond-p tterm
-                                   (ttmrg (ttmrg->path-cond tterm)
-                                          (ttmrg->judgements tterm)
-                                          (refine-judgement (ttmrg->judgements tterm)
+                                   (tterm (tterm->path-cond tterm)
+                                          (tterm->judgements tterm)
+                                          (refine-judgement (tterm->judgements tterm)
                                                             top)
-                                          (ttmrg-guts-if new-condx new-thenx
+                                          (tterm-guts-if new-condx new-thenx
                                                          new-elsex))))))
 
   (local
-   (defrule refine-ttmrg-zip-inductive-case
+   (defrule refine-tterm-zip-inductive-case
      (implies (and (consp tterms)
                    (consp tops)
                    (not (equal new-head
-                               (make-ttmrg-trivial nil)))
+                               (make-tterm-trivial nil)))
                    (top-down-postcond-p (car tterms)
                                         new-head)
                    (top-down-args-postcond-p (cdr tterms)
                                              new-tail)
-                   (ttmrg-list-p tterms)
+                   (tterm-list-p tterms)
                    (top-down-args-precond-p tterms)
                    (judge-set-list-p tops))
               (top-down-args-postcond-p tterms
@@ -994,19 +994,19 @@
      :in-theory (enable top-down-args-postcond-p)))
 
   (local
-   (defrule refine-ttmrg-zip-degenerate-case-0
+   (defrule refine-tterm-zip-degenerate-case-0
      (implies (consp tterms)
               (not (equal (len tterms) 0)))))
 
-  (defthm-refine-ttmrg-flag
+  (defthm-refine-tterm-flag
     (defthm refine-if-implements-top-down-postcond-p
-      (implies (and (ttmrg-p tterm)
+      (implies (and (tterm-p tterm)
                     (judge-set-p top)
                     (type-options-p options)
                     (top-down-precond-p tterm)
-                    (equal (ttmrg->kind tterm) :if)
+                    (equal (tterm->kind tterm) :if)
                     (not (equal (refine-if tterm top options state)
-                                (make-ttmrg-trivial nil))))
+                                (make-tterm-trivial nil))))
 	       (top-down-postcond-p tterm (refine-if tterm top options state)))
       :flag refine-if
       :skip t
@@ -1014,7 +1014,7 @@
 
     (defthm zip-refine-implements-top-down-args-postcond-p
       (mv-let (err rv) (zip-refine tterms tops options state)
-        (implies (and (ttmrg-list-p tterms)
+        (implies (and (tterm-list-p tterms)
                       (judge-set-list-p tops)
                       (type-options-p options)
                       (= (len tterms)
@@ -1027,78 +1027,78 @@
                          (top-down-args-postcond-p tterms nil)))))
 
     (defthm refine-fn-implements-top-down-postcond-p
-      (implies (and (ttmrg-p tterm)
+      (implies (and (tterm-p tterm)
                     (judge-set-p top)
                     (type-options-p options)
                     (top-down-precond-p tterm)
-                    (equal (ttmrg->kind tterm) :fncall)
+                    (equal (tterm->kind tterm) :fncall)
                     (not (equal (refine-fn tterm top options state)
-			        (make-ttmrg-trivial nil))))
+			        (make-tterm-trivial nil))))
 	       (top-down-postcond-p tterm (refine-fn tterm top options state)))
       :skip t
       :flag refine-fn
       :hints ('(:expand ((refine-fn tterm top options state)))))
 
-    (defthm refine-ttmrg-implements-top-down-postcond-p
-      (implies (not (equal (refine-ttmrg tterm top options state)
-			   (make-ttmrg-trivial nil)))
-	       (top-down-postcond-p tterm (refine-ttmrg tterm top options state)))
-      :flag refine-ttmrg
-      :hints ('(:expand ((refine-ttmrg tterm top options state)))))
+    (defthm refine-tterm-implements-top-down-postcond-p
+      (implies (not (equal (refine-tterm tterm top options state)
+			   (make-tterm-trivial nil)))
+	       (top-down-postcond-p tterm (refine-tterm tterm top options state)))
+      :flag refine-tterm
+      :hints ('(:expand ((refine-tterm tterm top options state)))))
 
     :hints (("Goal"
 	      :in-theory (disable (:executable-counterpart
-	                           make-ttmrg-trivial)))))
+	                           make-tterm-trivial)))))
 
-  (defrule refine-ttmrg-satisfies-clause-processor-relations
-    (let ((rv (refine-ttmrg tterm top options state)))
+  (defrule refine-tterm-satisfies-clause-processor-relations
+    (let ((rv (refine-tterm tterm top options state)))
       (implies (top-down-postcond-p tterm rv)
                (and
-                 (equal (ev-smtcp (ttmrg->expr rv)
+                 (equal (ev-smtcp (tterm->expr rv)
                                   a)
-                        (ev-smtcp (ttmrg->expr tterm)
+                        (ev-smtcp (tterm->expr tterm)
                                   a))
                  (implies
-                   (ttmrg-correct-p tterm a)
-                   (ttmrg-correct-p rv a)))))))
+                   (tterm-correct-p tterm a)
+                   (tterm-correct-p rv a)))))))
 
 
-(define refine-ttmrg-wrapper ((tterm ttmrg-p)
+(define refine-tterm-wrapper ((tterm tterm-p)
                               (options type-options-p)
                               state)
-  :returns (new-tt ttmrg-p)
-  (refine-ttmrg tterm *bool-judgement* options state)
+  :returns (new-tt tterm-p)
+  (refine-tterm tterm *bool-judgement* options state)
   ///
-  (defthmd refine-ttmrg-wrapper-implements-top-down-postcond-p
-    (b* ((new-tt (refine-ttmrg-wrapper tterm options state)))
+  (defthmd refine-tterm-wrapper-implements-top-down-postcond-p
+    (b* ((new-tt (refine-tterm-wrapper tterm options state)))
       (implies (not (equal new-tt
-                           (make-ttmrg-trivial nil)))
+                           (make-tterm-trivial nil)))
                (top-down-postcond-p tterm new-tt))))
 
-  (defthmd refine-ttmrg-wrapper-satisfies-clause-processor-relations-hypo
-    (b* ((new-tt (refine-ttmrg-wrapper tterm options state)))
+  (defthmd refine-tterm-wrapper-satisfies-clause-processor-relations-hypo
+    (b* ((new-tt (refine-tterm-wrapper tterm options state)))
       (implies (top-down-postcond-p tterm new-tt)
                (and
-                 (equal (ev-smtcp (ttmrg->expr new-tt)
+                 (equal (ev-smtcp (tterm->expr new-tt)
                                   a)
-                        (ev-smtcp (ttmrg->expr tterm)
+                        (ev-smtcp (tterm->expr tterm)
                                   a))
                  (implies
-                   (ttmrg-correct-p tterm a)
-                   (ttmrg-correct-p new-tt a))))))
+                   (tterm-correct-p tterm a)
+                   (tterm-correct-p new-tt a))))))
 
-  (defrule refine-ttmrg-wrapper-satisfies-clause-processor-relations
-    (let ((new-tt (refine-ttmrg-wrapper tterm options state)))
+  (defrule refine-tterm-wrapper-satisfies-clause-processor-relations
+    (let ((new-tt (refine-tterm-wrapper tterm options state)))
       (and
-        (implies (ev-smtcp (ttmrg->expr new-tt) a)
-                 (ev-smtcp (ttmrg->expr tterm) a))
-        (implies (ttmrg-correct-p tterm a)
-                 (ttmrg-correct-p new-tt a))))
-    :in-theory (e/d (refine-ttmrg-wrapper-implements-top-down-postcond-p
-                     refine-ttmrg-wrapper-satisfies-clause-processor-relations-hypo)
-                    ((:executable-counterpart make-ttmrg-trivial)))
-    :cases ((equal (refine-ttmrg-wrapper tterm options state)
-                   (make-ttmrg-trivial nil)))))
+        (implies (ev-smtcp (tterm->expr new-tt) a)
+                 (ev-smtcp (tterm->expr tterm) a))
+        (implies (tterm-correct-p tterm a)
+                 (tterm-correct-p new-tt a))))
+    :in-theory (e/d (refine-tterm-wrapper-implements-top-down-postcond-p
+                     refine-tterm-wrapper-satisfies-clause-processor-relations-hypo)
+                    ((:executable-counterpart make-tterm-trivial)))
+    :cases ((equal (refine-tterm-wrapper tterm options state)
+                   (make-tterm-trivial nil)))))
 
 
 (define type-judge-top-down-cp ((cl pseudo-term-listp)
@@ -1107,15 +1107,15 @@
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
        (goal (disjoin cl))
-       ((mv fail tterm) (ttmrg-parse-clause goal))
+       ((mv fail tterm) (tterm-parse-clause goal))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal 'type-judge-top-down *SMT-architecture*)))
        ((if (null next-cp)) (mv t nil state))
        (type-opt (construct-type-options hint goal))
-       (new-tt (refine-ttmrg-wrapper tterm type-opt state))
+       (new-tt (refine-tterm-wrapper tterm type-opt state))
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
-       (new-cl (ttmrg-clause new-tt))
+       (new-cl (tterm-clause new-tt))
        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
     (value (list hinted-goal))))
 
@@ -1134,7 +1134,7 @@
   :expand ((type-judge-top-down-cp cl hint state))
   :use ((:functional-instance
           correctness-of-tterm-trans-fn-cp
-          (tterm-trans-fn refine-ttmrg-wrapper)
+          (tterm-trans-fn refine-tterm-wrapper)
           (env-trans-fn (lambda (x) x))
           (current-cp-fn (lambda () 'type-judge-top-down))
           (tterm-trans-fn-cp type-judge-top-down-cp)))

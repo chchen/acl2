@@ -24,7 +24,7 @@
 (include-book "../verified/basics")
 (include-book "../verified/hint-interface")
 (include-book "../verified/smt-judgement")
-(include-book "../verified/ttmrg3")
+(include-book "../verified/tterm")
 (include-book "../verified/term-rewrite")
 
 (set-state-ok t)

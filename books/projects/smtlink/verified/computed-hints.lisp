@@ -16,7 +16,7 @@
 (include-book "tools/rewrite-dollar" :dir :system)
 
 (include-book "hint-interface")
-;;(include-book "ttmrg-clause")
+;;(include-book "tterm-clause")
 ;;(include-book "term-rewrite")
 ;;(include-book "../trusted/smt-lib")
 

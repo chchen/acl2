@@ -18,7 +18,7 @@
 (include-book "verified/term-rewrite")
 ;; (include-book "verified/type-inference-bottomup")
 ;; (include-book "verified/type-inference-topdown")
-(include-book "verified/ttmrg-triv-cp")
+(include-book "verified/tterm-triv-cp")
 ;;(include-book "verified/ti-bottom-up3")
 (include-book "verified/tibu")
 (include-book "verified/ti-top-down")

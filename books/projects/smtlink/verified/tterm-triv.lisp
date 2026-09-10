@@ -7,21 +7,21 @@
 (in-package "SMT")
 
 ; This book has three main exports:
-;   Function that make correct ttmrg and ttmrg-args values from pseudo-termp
+;   Function that make correct tterm and tterm-args values from pseudo-termp
 ;       and pseudo-term-listp objects respectively.  The functions we export
 ;       are
-;     make-ttmrg-trivial and make-ttmrg-args-trivial.
+;     make-tterm-trivial and make-tterm-args-trivial.
 ;   Theorems that show that these functions produce values satisfying
-;       ttmrg-correct-p and ttmrg-args-correct-p.  These theorems are
-;     ttmrg-correct-p-of-make-ttmrg-trivial and
-;     ttmrg-args-correct-p-of-mke-ttmrg-args-trivial.
+;       tterm-correct-p and tterm-args-correct-p.  These theorems are
+;     tterm-correct-p-of-make-tterm-trivial and
+;     tterm-args-correct-p-of-mke-tterm-args-trivial.
 ;   Theorems that show that if a term satisfies pseudo-term-syntax-p, then
-;       (equal (ttmrg->term (make-ttmrg-trivial term)) term)
-;     and likewise for make-ttmrg-args-trivial.  These theorems are
-;       make-ttmrg-trivial-when-pseudo-term-syntax-p and
-;       make-ttmrg-args-trivial-when-pseudo-term-list-syntax-p and
+;       (equal (tterm->term (make-tterm-trivial term)) term)
+;     and likewise for make-tterm-args-trivial.  These theorems are
+;       make-tterm-trivial-when-pseudo-term-syntax-p and
+;       make-tterm-args-trivial-when-pseudo-term-list-syntax-p and
 
-(include-book "ttmrg3")
+(include-book "tterm")
 
 (set-induction-depth-limit 1)
 (make-event
@@ -48,82 +48,82 @@
   acl2::pseudo-termp-car all-tail<judge-ev> acl2::subsetp-car-member)))
 
 
-(defines make-ttmrg-trivial
+(defines make-tterm-trivial
   :verify-guards nil
   :ruler-extenders :all
 
-  (define make-ttmrg-trivial ((term pseudo-termp))
-    :returns (tterm ttmrg-p)
+  (define make-tterm-trivial ((term pseudo-termp))
+    :returns (tterm tterm-p)
     :flag term
-    (make-ttmrg
+    (make-tterm
       :path-cond nil
       :judgements nil
       :smt-judgements nil
       :guts
 	(b* (((if (symbolp term))
-	      (make-ttmrg-guts-var :name term))
-	     ((unless (mbt (consp term))) (make-ttmrg-guts-var :name 'bad-term))
+	      (make-tterm-guts-var :name term))
+	     ((unless (mbt (consp term))) (make-tterm-guts-var :name 'bad-term))
 	     ((cons fn args) term)
 	     ((if (equal fn 'quote))
-	      (make-ttmrg-guts-quote :val (cadr term)))
+	      (make-tterm-guts-quote :val (cadr term)))
 	     ((if (equal fn 'if))
-	      (make-ttmrg-guts-if
-		:condx (make-ttmrg-trivial (car args))
-		:thenx (make-ttmrg-trivial (cadr args))
-		:elsex (make-ttmrg-trivial (caddr args))))
+	      (make-tterm-guts-if
+		:condx (make-tterm-trivial (car args))
+		:thenx (make-tterm-trivial (cadr args))
+		:elsex (make-tterm-trivial (caddr args))))
 	     ((if (symbolp fn))
-	      (make-ttmrg-guts-fncall :f fn :args (make-ttmrg-list-trivial args))))
-	    (make-ttmrg-guts-var :name 'bad-term))))
+	      (make-tterm-guts-fncall :f fn :args (make-tterm-list-trivial args))))
+	    (make-tterm-guts-var :name 'bad-term))))
 
-  (define make-ttmrg-list-trivial ((lst pseudo-term-listp))
-    :returns (ttlst ttmrg-list-p)
+  (define make-tterm-list-trivial ((lst pseudo-term-listp))
+    :returns (ttlst tterm-list-p)
     :flag list
     (if (consp lst)
-       (cons (make-ttmrg-trivial (car lst))
-	     (make-ttmrg-list-trivial (cdr lst)))
+       (cons (make-tterm-trivial (car lst))
+	     (make-tterm-list-trivial (cdr lst)))
        nil))
   ///
-  (verify-guards make-ttmrg-trivial
+  (verify-guards make-tterm-trivial
     :hints(("Goal" :in-theory (enable pseudo-termp pseudo-term-listp))))
 
   (encapsulate nil
-    (local (defrule args->path-cond-ev-of-make-ttmrg-list-trivial
-      (args->path-cond-ev (make-ttmrg-list-trivial lst) a)
+    (local (defrule args->path-cond-ev-of-make-tterm-list-trivial
+      (args->path-cond-ev (make-tterm-list-trivial lst) a)
       :induct (len lst)
-      :in-theory (enable args->path-cond-ev make-ttmrg-list-trivial)
+      :in-theory (enable args->path-cond-ev make-tterm-list-trivial)
       :prep-lemmas (
-	(defrule ttmrg->path-cond-ev-of-make-ttmrg-trivial
-	  (ttmrg->path-cond-ev (make-ttmrg-trivial term) a)
-	  :in-theory (enable ttmrg->path-cond-ev)
-	  :expand ((make-ttmrg-trivial term))))))
+	(defrule tterm->path-cond-ev-of-make-tterm-trivial
+	  (tterm->path-cond-ev (make-tterm-trivial term) a)
+	  :in-theory (enable tterm->path-cond-ev)
+	  :expand ((make-tterm-trivial term))))))
 
-    (local (defrule ttmrg->path-cond-ev-of-make-ttmrg-trivial
-      (ttmrg->path-cond-ev (make-ttmrg-trivial term) a)
-      :in-theory (enable ttmrg->path-cond-ev)
-      :expand (make-ttmrg-trivial term)))
+    (local (defrule tterm->path-cond-ev-of-make-tterm-trivial
+      (tterm->path-cond-ev (make-tterm-trivial term) a)
+      :in-theory (enable tterm->path-cond-ev)
+      :expand (make-tterm-trivial term)))
 
-    (local (acl2::defruled ttmrg->judgements-evs-of-make-ttmrg-trivial
+    (local (acl2::defruled tterm->judgements-evs-of-make-tterm-trivial
              (and
-               (ttmrg->judgements-ev (make-ttmrg-trivial term) a)
-               (ttmrg->smt-judgements-ev (make-ttmrg-trivial term) a))
-             :in-theory (enable ttmrg->judgements-ev ttmrg->smt-judgements-ev)
-             :expand (make-ttmrg-trivial term)))
+               (tterm->judgements-ev (make-tterm-trivial term) a)
+               (tterm->smt-judgements-ev (make-tterm-trivial term) a))
+             :in-theory (enable tterm->judgements-ev tterm->smt-judgements-ev)
+             :expand (make-tterm-trivial term)))
 
-    (defthm-make-ttmrg-trivial-flag
-      (defthm ttmrg-correct-p-of-make-ttmrg-trivial
-	(ttmrg-correct-p (make-ttmrg-trivial term) a)
+    (defthm-make-tterm-trivial-flag
+      (defthm tterm-correct-p-of-make-tterm-trivial
+	(tterm-correct-p (make-tterm-trivial term) a)
 	:flag term)
 
-      (defthm ttmrg-list-correct-p-of-make-ttmrg-trivial
-	(ttmrg-list-correct-p (make-ttmrg-list-trivial lst) a)
+      (defthm tterm-list-correct-p-of-make-tterm-trivial
+	(tterm-list-correct-p (make-tterm-list-trivial lst) a)
 	:flag list)
       :hints(
-        ("Goal" :in-theory (enable ttmrg-correct-p ttmrg-list-correct-p
-				   make-ttmrg-trivial))
-	; a computed hint because all of the subgoals for make-ttmrg-trivial
-	; need an instantiation of ttmrg->judgements-ev-of-make-ttmrg-trivial.
+        ("Goal" :in-theory (enable tterm-correct-p tterm-list-correct-p
+				   make-tterm-trivial))
+	; a computed hint because all of the subgoals for make-tterm-trivial
+	; need an instantiation of tterm->judgements-ev-of-make-tterm-trivial.
 	(and (member-equal '(not (acl2::flag-is 'term)) clause)
-	     '(:use ((:instance ttmrg->judgements-evs-of-make-ttmrg-trivial))))))))
+	     '(:use ((:instance tterm->judgements-evs-of-make-tterm-trivial))))))))
 
 
 (defines pseudo-term-syntax
@@ -163,17 +163,17 @@
     :hints(("Goal" :in-theory (enable pseudo-termp pseudo-term-listp))))
 
   (defthm-pseudo-term-syntax-flag
-    (defthm make-ttmrg-trivial-when-pseudo-term-syntax-p
+    (defthm make-tterm-trivial-when-pseudo-term-syntax-p
       (implies (pseudo-term-syntax-p term)
-	       (equal (ttmrg->expr (make-ttmrg-trivial term)) term))
+	       (equal (tterm->expr (make-tterm-trivial term)) term))
       :flag term)
 
-    (defthm make-ttmrg-list-trivial-when-pseudo-term-list-syntax-p
+    (defthm make-tterm-list-trivial-when-pseudo-term-list-syntax-p
       (implies (pseudo-term-list-syntax-p lst)
-	       (equal (ttmrg-list->expr-list (make-ttmrg-list-trivial lst)) lst))
+	       (equal (tterm-list->expr-list (make-tterm-list-trivial lst)) lst))
       :flag list)
 
     :hints(("Goal"
       :in-theory (enable pseudo-term-syntax-p pseudo-term-list-syntax-p
-			 make-ttmrg-trivial make-ttmrg-list-trivial
-			 ttmrg->expr ttmrg-list->expr-list)))))
+			 make-tterm-trivial make-tterm-list-trivial
+			 tterm->expr tterm-list->expr-list)))))

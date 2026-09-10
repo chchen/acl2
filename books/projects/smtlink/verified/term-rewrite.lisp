@@ -18,7 +18,7 @@
 
 (include-book "basics")
 (include-book "hint-interface")
-(include-book "ttmrg-clause")
+(include-book "tterm-clause")
 
 (set-state-ok t)
 (set-induction-depth-limit 1)
@@ -93,11 +93,11 @@
          (smt-hint (unquote q-smt-hint))
          (translation-theory (smtlink-hint->translation-theory smt-hint))
          (goal (disjoin cl))
-         ((mv fail tterm) (ttmrg-parse-clause goal))
-         ((if fail) (prog2$ (cw "not a ttmrg-clause: ~x0~%" tterm)
+         ((mv fail tterm) (tterm-parse-clause goal))
+         ((if fail) (prog2$ (cw "not a tterm-clause: ~x0~%" tterm)
                             (value nil)))
-         (expr (ttmrg->expr tterm))
-         (correct-smt-exprs (list (ttmrg-correct-smt-expr tterm)))
+         (expr (tterm->expr tterm))
+         (correct-smt-exprs (list (tterm-correct-smt-expr tterm)))
          ((mv fail new-expr state)
           (rewrite$-helper expr
                            correct-smt-exprs
@@ -115,7 +115,7 @@
 
 
   ;; Clause processors
-  ;; If rewritten term = original ttmrg->expr, continue as if 'term-rewrite
+  ;; If rewritten term = original tterm->expr, continue as if 'term-rewrite
   ;; Reinjects rewritten term as if it came from 'process-hint
   ;; Discharge equality side condition with hint from translation-theory
   (define term-rewrite-cp ((cl pseudo-term-listp)
@@ -127,10 +127,10 @@
          ((unless (smtlink-hint-p smt-hint)) (mv t nil state))
          ((unless (pseudo-termp new-expr)) (mv t nil state))
          (goal (disjoin cl))
-         ((mv fail tterm) (ttmrg-parse-clause goal))
+         ((mv fail tterm) (tterm-parse-clause goal))
          ((if fail) (mv t nil state))
-         (orig-expr (ttmrg->expr tterm))
-         (orig-correct-expr (ttmrg-correct-expr tterm)))
+         (orig-expr (tterm->expr tterm))
+         (orig-correct-expr (tterm-correct-expr tterm)))
       (if (equal orig-expr new-expr)
           (prog2$ (cw "term-rewrite-cp: rewrite$ did not change term~%")
                   (b* ((next-cp (cdr (assoc-equal 'term-rewrite
@@ -138,7 +138,7 @@
                        ((if (null next-cp)) (mv t nil state))
                        (the-hint
                          `(:clause-processor (,next-cp clause ',smt-hint state)))
-                       (new-cl (ttmrg-clause tterm))
+                       (new-cl (tterm-clause tterm))
                        (hinted-goal `((hint-please ',the-hint) ,new-cl)))
                     (value (list hinted-goal))))
         (prog2$ (cw "term-rewrite-cp: feeding new term back into pipeline~%")

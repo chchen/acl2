@@ -13,10 +13,10 @@
 (include-book "misc/beta-reduce" :dir :system)
 (include-book "tools/rewrite-dollar" :dir :system)
 (include-book "tools/easy-simplify" :dir :system)
-;(include-book "ttmrg-clause-cp")
-(include-book "ttmrg-change3")
+;(include-book "tterm-clause-cp")
+(include-book "tterm-change")
 ;(include-book "type-options")
-(include-book "ttmrg-triv3")
+(include-book "tterm-triv")
 (include-book "term-rewrite") ; for rewrite$-helper
 (include-book "make-test")
 
@@ -30,33 +30,33 @@
 ; slows down certifying or loading this book.
 (local (in-theory (disable pseudo-termp)))
 
-(fty::defalist nat-ttmrg-alist
+(fty::defalist nat-tterm-alist
   :key-type natp
-  :val-type ttmrg-p
+  :val-type tterm-p
   :true-listp nil)  ; fast-alist's are not true-listp's
 
 (fty::defprod proto-judge-acc
   ((next-index natp :default 0)
    (recognizers symbol-listp :default nil)
-   (j-alist nat-ttmrg-alist-p :default nil)))
+   (j-alist nat-tterm-alist-p :default nil)))
 
 (local (defsection debug-help
   (defines show-tterm
-    (define show-ttermx ((tterm ttmrg-p) (indent stringp))
-      :measure (ttmrg-count (ttmrg-fix tterm))
+    (define show-ttermx ((tterm tterm-p) (indent stringp))
+      :measure (tterm-count (tterm-fix tterm))
       :returns (nothing null)
-      (b* (((ttmrg tterm) (ttmrg-fix tterm))
-	   (- (cw "~s0( expr -> ~x1~%" indent (ttmrg->expr tterm)))
+      (b* (((tterm tterm) (tterm-fix tterm))
+	   (- (cw "~s0( expr -> ~x1~%" indent (tterm->expr tterm)))
 	   (indent+ (acl2::implode (list* #\Space #\Space (acl2::explode indent))))
 	   (- (cw "~s0 path-cond -> ~x1~%" indent+ tterm.path-cond))
 	   (- (cw "~s0 judgements -> ~x1~%" indent+ tterm.judgements))
 	   (- (show-guts tterm.guts indent+)))
 	(cw "~s0)~%" indent)))
 
-    (define show-guts ((guts ttmrg-guts-p) (indent stringp))
-      :measure (ttmrg-guts-count (ttmrg-guts-fix guts))
+    (define show-guts ((guts tterm-guts-p) (indent stringp))
+      :measure (tterm-guts-count (tterm-guts-fix guts))
       :returns (nothing null)
-      (ttmrg-guts-case guts
+      (tterm-guts-case guts
         :if
 	  (b* ((indent+ (acl2::implode (list* #\Space #\Space (acl2::explode indent))))
 	       (- (cw "~s0 condx ->~%" indent))
@@ -73,16 +73,16 @@
 	    (cw "~s0)~%" indent))
         :otherwise nil))
 
-    (define show-args ((args ttmrg-list-p) (indent stringp))
-      :measure (ttmrg-list-count (ttmrg-list-fix args))
+    (define show-args ((args tterm-list-p) (indent stringp))
+      :measure (tterm-list-count (tterm-list-fix args))
       :returns (nothing null)
-      (b* ((args (ttmrg-list-fix args))
+      (b* ((args (tterm-list-fix args))
 	   ((unless args) nil)
 	   ((cons hd tl) args)
 	   (- (show-ttermx hd indent)))
 	(show-args tl indent))))
 
-  (define show-tterm ((tterm ttmrg-p))
+  (define show-tterm ((tterm tterm-p))
     :returns (nothing null)
     (show-ttermx tterm ""))
 
@@ -113,16 +113,16 @@
     ///
     (more-returns (v :name bad-equal-is-identity (equal v val))))
 
-  (define show-j-alist-help ((a nat-ttmrg-alist-p))
+  (define show-j-alist-help ((a nat-tterm-alist-p))
     (b* (((unless (consp a)) nil)
 	 ((cons (cons index tterm) tl) a)
-	 (- (cw "( expr -> ~x0~%" (ttmrg->expr tterm)))
+	 (- (cw "( expr -> ~x0~%" (tterm->expr tterm)))
 	 (- (cw "  index -> ~x0~%" index))
-	 (- (cw "  path-cond -> ~x0~%" (ttmrg->path-cond tterm)))
-	 (- (cw "  judgements -> ~x0 )~%" (ttmrg->judgements tterm))))
+	 (- (cw "  path-cond -> ~x0~%" (tterm->path-cond tterm)))
+	 (- (cw "  judgements -> ~x0 )~%" (tterm->judgements tterm))))
       (show-j-alist-help tl)))
 
-  (define show-j-alist((j-alist nat-ttmrg-alist-p))
+  (define show-j-alist((j-alist nat-tterm-alist-p))
     (show-j-alist-help (set::mergesort j-alist)))))
 
 (defsection path-cond
@@ -193,165 +193,165 @@ with cond and (not cond) respectively."
 	(iff (all<pseudo-term-ev> pset a)
 	     (ev-smtcp (pseudo-term-fix term) a)))))
 
-  (define ttmrg-list-update-path-cond ((lst ttmrg-list-p) (parent ttmrg-p))
-    :returns (new-lst ttmrg-list-p)
+  (define tterm-list-update-path-cond ((lst tterm-list-p) (parent tterm-p))
+    :returns (new-lst tterm-list-p)
     (if (consp lst)
-      (cons (ttmrg-add-path-cond-tterm (car lst) parent)
-	    (ttmrg-list-update-path-cond (cdr lst) parent))
+      (cons (tterm-add-path-cond-tterm (car lst) parent)
+	    (tterm-list-update-path-cond (cdr lst) parent))
       nil)
     ///
-    (defcong ttmrg-list-equiv ttmrg-list-equiv
-	     (ttmrg-list-update-path-cond lst parent) 1
+    (defcong tterm-list-equiv tterm-list-equiv
+	     (tterm-list-update-path-cond lst parent) 1
       :hints(("Goal" :induct (pairlis$ lst lst-equiv))))
-    (defcong ttmrg->path-cond-equiv ttmrg-list-equiv
-	     (ttmrg-list-update-path-cond lst parent) 2
+    (defcong tterm->path-cond-equiv tterm-list-equiv
+	     (tterm-list-update-path-cond lst parent) 2
       :hints(("Goal" :induct (len lst))))
     (more-returns
-      (new-lst :name ttmrg-list->expr-list-equiv-of-ttmrg-list-update-path-cond
-	(ttmrg-list->expr-list-equiv new-lst lst))
+      (new-lst :name tterm-list->expr-list-equiv-of-tterm-list-update-path-cond
+	(tterm-list->expr-list-equiv new-lst lst))
 
-      (new-lst :name ttmrg-list-correct-p-of-ttmrg-list-update-path-cond
-	(implies (ttmrg-list-correct-p lst a)
-		 (ttmrg-list-correct-p new-lst a)))
+      (new-lst :name tterm-list-correct-p-of-tterm-list-update-path-cond
+	(implies (tterm-list-correct-p lst a)
+		 (tterm-list-correct-p new-lst a)))
 
-      (new-lst :name args->path-cond-ev-of-ttmrg-list-update-path-cond
-	(implies (and (ttmrg->path-cond-ev parent a)
+      (new-lst :name args->path-cond-ev-of-tterm-list-update-path-cond
+	(implies (and (tterm->path-cond-ev parent a)
 		      (args->path-cond-ev lst a))
 		 (args->path-cond-ev new-lst a)))))
 
-  (define ttmrg-update-path-cond-children ((tterm ttmrg-p))
-    :returns (new-tt ttmrg-p)
-    (case (ttmrg->kind tterm)
-      (:var (ttmrg-fix tterm))
-      (:quote (ttmrg-fix tterm))
+  (define tterm-update-path-cond-children ((tterm tterm-p))
+    :returns (new-tt tterm-p)
+    (case (tterm->kind tterm)
+      (:var (tterm-fix tterm))
+      (:quote (tterm-fix tterm))
       (:if
-	(b* ((condx (ttmrg->condx tterm))
-	     (thenx (ttmrg->thenx tterm))
-	     (elsex (ttmrg->elsex tterm))
-	     (cond-expr  (ttmrg->expr condx)))
-	  (change-ttmrg
+	(b* ((condx (tterm->condx tterm))
+	     (thenx (tterm->thenx tterm))
+	     (elsex (tterm->elsex tterm))
+	     (cond-expr  (tterm->expr condx)))
+	  (change-tterm
 	    tterm
 	    :guts
-	    (change-ttmrg-guts-if
-	      (ttmrg->guts tterm)
-	      :condx (ttmrg-add-path-cond-tterm condx tterm)
-	      :thenx (ttmrg-add-path-cond-set
-		       (ttmrg-add-path-cond-tterm thenx tterm)
+	    (change-tterm-guts-if
+	      (tterm->guts tterm)
+	      :condx (tterm-add-path-cond-tterm condx tterm)
+	      :thenx (tterm-add-path-cond-set
+		       (tterm-add-path-cond-tterm thenx tterm)
 		       (parse-conjunct cond-expr))
-	      :elsex (ttmrg-add-path-cond-set
-		       (ttmrg-add-path-cond-tterm elsex tterm)
+	      :elsex (tterm-add-path-cond-set
+		       (tterm-add-path-cond-tterm elsex tterm)
 		       (parse-conjunct (negate cond-expr)))))))
       (:fncall
-	(b* ((new-args (ttmrg-list-update-path-cond (ttmrg->args tterm) tterm))
-	     (new-guts (make-ttmrg-guts-fncall
-			 :f (ttmrg->f tterm)
+	(b* ((new-args (tterm-list-update-path-cond (tterm->args tterm) tterm))
+	     (new-guts (make-tterm-guts-fncall
+			 :f (tterm->f tterm)
 			 :args new-args)))
-	  (make-ttmrg :path-cond (ttmrg->path-cond tterm)
-		      :judgements (ttmrg->judgements tterm)
-		      :smt-judgements (ttmrg->smt-judgements tterm)
+	  (make-tterm :path-cond (tterm->path-cond tterm)
+		      :judgements (tterm->judgements tterm)
+		      :smt-judgements (tterm->smt-judgements tterm)
 		      :guts new-guts))))
     ///
-    (defcong ttmrg-equiv ttmrg-equiv (ttmrg-update-path-cond-children tterm) 1)
+    (defcong tterm-equiv tterm-equiv (tterm-update-path-cond-children tterm) 1)
     (more-returns
-      (new-tt :name ttmrg->path-cond-of-ttmrg-update-path-cond-children
-	(ttmrg->path-cond-equiv new-tt tterm))
+      (new-tt :name tterm->path-cond-of-tterm-update-path-cond-children
+	(tterm->path-cond-equiv new-tt tterm))
 
-      (new-tt :name ttmrg->judgements-of-ttmrg-update-path-cond-children
-	      (ttmrg->judgements-equiv new-tt tterm))
+      (new-tt :name tterm->judgements-of-tterm-update-path-cond-children
+	      (tterm->judgements-equiv new-tt tterm))
 
-      (new-tt :name ttmrg->smt-judgements-of-ttmrg-update-path-cond-children
-	      (ttmrg->smt-judgements-equiv new-tt tterm))
+      (new-tt :name tterm->smt-judgements-of-tterm-update-path-cond-children
+	      (tterm->smt-judgements-equiv new-tt tterm))
 
-      (new-tt :name ttmrg->kind-of-ttmrg-update-path-cond-children
-	(ttmrg->kind-equiv new-tt tterm))))
+      (new-tt :name tterm->kind-of-tterm-update-path-cond-children
+	(tterm->kind-equiv new-tt tterm))))
 
-  (local (defrule ttmrg-equiv-of-var-or-quote
+  (local (defrule tterm-equiv-of-var-or-quote
     (implies
-      (or (equal (ttmrg->kind tterm) :var)
-	  (equal (ttmrg->kind tterm) :quote))
-      (ttmrg-equiv (ttmrg-update-path-cond-children tterm)
+      (or (equal (tterm->kind tterm) :var)
+	  (equal (tterm->kind tterm) :quote))
+      (tterm-equiv (tterm-update-path-cond-children tterm)
 		   tterm))
-    :in-theory (enable ttmrg-update-path-cond-children)))
+    :in-theory (enable tterm-update-path-cond-children)))
 
   (local (defrule lemma-if-details
-    (let* ((condx (ttmrg->condx tterm))
-	   (thenx (ttmrg->thenx tterm))
-	   (elsex (ttmrg->elsex tterm))
-	   (cond-expr  (ttmrg->expr condx))
-	   (new-tt (ttmrg-update-path-cond-children tterm))
-	   (new-condx (ttmrg-add-path-cond-tterm condx tterm))
-	   (new-thenx (ttmrg-add-path-cond-set
-			(ttmrg-add-path-cond-tterm thenx tterm)
+    (let* ((condx (tterm->condx tterm))
+	   (thenx (tterm->thenx tterm))
+	   (elsex (tterm->elsex tterm))
+	   (cond-expr  (tterm->expr condx))
+	   (new-tt (tterm-update-path-cond-children tterm))
+	   (new-condx (tterm-add-path-cond-tterm condx tterm))
+	   (new-thenx (tterm-add-path-cond-set
+			(tterm-add-path-cond-tterm thenx tterm)
 			(parse-conjunct cond-expr)))
-	   (new-elsex (ttmrg-add-path-cond-set
-			(ttmrg-add-path-cond-tterm elsex tterm)
+	   (new-elsex (tterm-add-path-cond-set
+			(tterm-add-path-cond-tterm elsex tterm)
 			(parse-conjunct (negate cond-expr)))))
-      (implies (equal (ttmrg->kind tterm) :if)
-	       (and (ttmrg-equiv (ttmrg->condx new-tt) new-condx)
-		    (ttmrg-equiv (ttmrg->thenx new-tt) new-thenx)
-		    (ttmrg-equiv (ttmrg->elsex new-tt) new-elsex))))
-    :in-theory (enable ttmrg-update-path-cond-children)))
+      (implies (equal (tterm->kind tterm) :if)
+	       (and (tterm-equiv (tterm->condx new-tt) new-condx)
+		    (tterm-equiv (tterm->thenx new-tt) new-thenx)
+		    (tterm-equiv (tterm->elsex new-tt) new-elsex))))
+    :in-theory (enable tterm-update-path-cond-children)))
 
   (local (defrule lemma-fncall-details
-    (implies (equal (ttmrg->kind tterm) :fncall)
-      (let* ((new-tt (ttmrg-update-path-cond-children tterm))
-	     (args (ttmrg->args tterm))
-	     (new-args (ttmrg->args new-tt)))
-	(ttmrg-list-equiv new-args (ttmrg-list-update-path-cond args tterm))))
-    :in-theory (enable ttmrg-update-path-cond-children)))
+    (implies (equal (tterm->kind tterm) :fncall)
+      (let* ((new-tt (tterm-update-path-cond-children tterm))
+	     (args (tterm->args tterm))
+	     (new-args (tterm->args new-tt)))
+	(tterm-list-equiv new-args (tterm-list-update-path-cond args tterm))))
+    :in-theory (enable tterm-update-path-cond-children)))
 
-  (local (defrule ttmrg->judgements-and-expr-of-ttmrg-update-path-cond-children
-    (let ((new-tt (ttmrg-update-path-cond-children tterm)))
-      (and (ttmrg->judgements-and-expr-equiv new-tt tterm)
-	   (ttmrg->smt-judgements-and-expr-equiv new-tt tterm)))
-    :in-theory (enable ttmrg->judgements-and-expr-equiv
-		       ttmrg->smt-judgements-and-expr-equiv)
+  (local (defrule tterm->judgements-and-expr-of-tterm-update-path-cond-children
+    (let ((new-tt (tterm-update-path-cond-children tterm)))
+      (and (tterm->judgements-and-expr-equiv new-tt tterm)
+	   (tterm->smt-judgements-and-expr-equiv new-tt tterm)))
+    :in-theory (enable tterm->judgements-and-expr-equiv
+		       tterm->smt-judgements-and-expr-equiv)
     :prep-lemmas (
       (defrule lemma-fncall-f
-	(let ((new-tt (ttmrg-update-path-cond-children tterm)))
-	  (implies (equal (ttmrg->kind tterm) :fncall)
-		   (ttmrg->f-equiv new-tt tterm)))
-	:in-theory (enable ttmrg-update-path-cond-children
-			   ttmrg->f ttmrg->f-equiv))
+	(let ((new-tt (tterm-update-path-cond-children tterm)))
+	  (implies (equal (tterm->kind tterm) :fncall)
+		   (tterm->f-equiv new-tt tterm)))
+	:in-theory (enable tterm-update-path-cond-children
+			   tterm->f tterm->f-equiv))
       (defrule lemma-equal
-	(let ((new-tt (ttmrg-update-path-cond-children tterm)))
-	  (equal (ttmrg->expr new-tt) (ttmrg->expr tterm)))
+	(let ((new-tt (tterm-update-path-cond-children tt)))
+	  (equal (tterm->expr new-tt) (tterm->expr tt)))
 	:use((:instance
-	       ttmrg->expr (tterm (ttmrg-update-path-cond-children tterm)))
-	     (:instance ttmrg->expr))))))
+	       tterm->expr (tt (tterm-update-path-cond-children tt)))
+	     (:instance tterm->expr))))))
 
-  (defrule ttmrg->expr-of-ttmrg-update-path-cond-children
-    (let ((new-tt (ttmrg-update-path-cond-children tterm)))
-      (ttmrg->expr-equiv new-tt tterm)))
+  (defrule tterm->expr-of-tterm-update-path-cond-children
+    (let ((new-tt (tterm-update-path-cond-children tterm)))
+      (tterm->expr-equiv new-tt tterm)))
 
-  (defrule ttmrg-correct-p-of-ttmrg-update-path-cond-children
-    (let ((new-tt (ttmrg-update-path-cond-children tterm)))
-      (implies (ttmrg-correct-p tterm a)
-	       (ttmrg-correct-p new-tt a)))
-    :expand ((ttmrg-correct-p (ttmrg-update-path-cond-children tterm) a)))
+  (defrule tterm-correct-p-of-tterm-update-path-cond-children
+    (let ((new-tt (tterm-update-path-cond-children tterm)))
+      (implies (tterm-correct-p tterm a)
+	       (tterm-correct-p new-tt a)))
+    :expand ((tterm-correct-p (tterm-update-path-cond-children tterm) a)))
 
-  (define ttmrg-upcc-ignore-options-and-state
-      ((tterm ttmrg-p) (opts acl2::any-p) (state state-p))
+  (define tterm-upcc-ignore-options-and-state
+      ((tterm tterm-p) (opts acl2::any-p) (state state-p))
     :ignore-ok t
-    (ttmrg-update-path-cond-children tterm))
+    (tterm-update-path-cond-children tterm))
 
-  (in-theory (enable ttmrg-upcc-ignore-options-and-state))
-  (ttmrg-propagate path-cond :pre ttmrg-upcc-ignore-options-and-state)
-  (in-theory (disable ttmrg-upcc-ignore-options-and-state)))
+  (in-theory (enable tterm-upcc-ignore-options-and-state))
+  (tterm-propagate path-cond :pre tterm-upcc-ignore-options-and-state)
+  (in-theory (disable tterm-upcc-ignore-options-and-state)))
 
 (defsection proto-judgements
-  :short "add judgements to each subterm of a ttmrg"
-  :long  "Add judgements to a ttmrg of the form
+  :short "add judgements to each subterm of a tterm"
+  :long  "Add judgements to a tterm of the form
     (my-equal (hide (cdr (cons expr-index (type-p x)))) (type-p x))
 for each type-recognizer, type-p, known to smtlink.  We'll use rewrite$ to simplify
-the ttmrg-correct-expr generated from these judgements.  This allows us to connect
+the tterm-correct-expr generated from these judgements.  This allows us to connect
 the hidden (type-p x) with the unhidden, and thus rewritten (type-p x).  rewrite$
 can change the structure of the term.  We use expr-index to match to the correct
 instance of a sub-expression."
-; Implementation note 1: This seems like a nice task for the ttmrg-propagate macro
-;   from the ttmrg-change3 book.  But, it doesn't provide a way to thread the counter
+; Implementation note 1: This seems like a nice task for the tterm-propagate macro
+;   from the tterm-change3 book.  But, it doesn't provide a way to thread the counter
 ;   through the tree walk.  I could modify the macro (or write a new one) that return
-;   (mv new-counter new-ttmrg-node), but that will add clutter of either having two
+;   (mv new-counter new-tterm-node), but that will add clutter of either having two
 ;   version of the macro, or forcing the smtlink developer to provide updating functions
 ;   that return an mv, even when they don't need it.  I could store counter in a table
 ;   in state.  That should work because we are planning on calling rewrite$ from a
@@ -365,7 +365,7 @@ instance of a sub-expression."
 ;   find these rules for highly-overloaded functions such as car and cdr.
 ;
 ;   Implementaion note 3: Because the judgements we add are trivial tautologies,
-;   adding these judgements should preserve ttmrg-correct-p.  I haven't included
+;   adding these judgements should preserve tterm-correct-p.  I haven't included
 ;   a proof because we have to verify the result of rewrite$ at run-time anyway.
 
   (define my-equal ((x acl2::any-p) (y acl2::any-p))
@@ -385,15 +385,15 @@ instance of a sub-expression."
 
   (defines proto-judgements
     :verify-guards nil
-    (define proto-judgements-term ((tterm ttmrg-p) (acc proto-judge-acc-p))
-      :returns (mv (new-tt ttmrg-p) (new-acc proto-judge-acc-p))
-      :measure (ttmrg-count (ttmrg-fix tterm))
+    (define proto-judgements-term ((tterm tterm-p) (acc proto-judge-acc-p))
+      :returns (mv (new-tt tterm-p) (new-acc proto-judge-acc-p))
+      :measure (tterm-count (tterm-fix tterm))
       :flag term
       (b* (((mv guts-x acc-x)
-	    (proto-judgements-guts (ttmrg->guts tterm) acc))
+	    (proto-judgements-guts (tterm->guts tterm) acc))
 	   ((proto-judge-acc acc-x) acc-x)
 	   (new-tt
-	    (change-ttmrg tterm
+	    (change-tterm tterm
 	      :guts guts-x
 	      :judgements
 		(proto-judge-help acc-x.recognizers acc-x.next-index)))
@@ -404,13 +404,13 @@ instance of a sub-expression."
 	(mv new-tt new-acc)))
 
     (define proto-judgements-guts
-	((guts ttmrg-guts-p)  (acc proto-judge-acc-p))
-      :returns (mv (new-guts ttmrg-guts-p) (new-acc proto-judge-acc-p))
-      :measure (ttmrg-guts-count (ttmrg-guts-fix guts))
+	((guts tterm-guts-p)  (acc proto-judge-acc-p))
+      :returns (mv (new-guts tterm-guts-p) (new-acc proto-judge-acc-p))
+      :measure (tterm-guts-count (tterm-guts-fix guts))
       :flag guts
-      (b* ((guts (ttmrg-guts-fix guts))
+      (b* ((guts (tterm-guts-fix guts))
 	   (acc0 (proto-judge-acc-fix acc)))
-	(ttmrg-guts-case guts
+	(tterm-guts-case guts
 	   :var (mv guts acc0)
 	   :quote (mv guts acc0)
 	   :if
@@ -420,21 +420,21 @@ instance of a sub-expression."
 		   (proto-judgements-term guts.thenx acc1))
 		  ((mv new-elsex acc3)
 		   (proto-judgements-term guts.elsex acc2)))
-	      (mv (change-ttmrg-guts-if guts
+	      (mv (change-tterm-guts-if guts
 		    :condx new-condx :thenx new-thenx :elsex new-elsex)
 		  acc3))
 	   :fncall
 	     (b* (((mv new-args acc1)
 		   (proto-judgements-list guts.args acc0)))
-	       (mv (change-ttmrg-guts-fncall guts :args new-args)
+	       (mv (change-tterm-guts-fncall guts :args new-args)
 		   acc1)))))
 
     (define proto-judgements-list
-	((ttlst ttmrg-list-p) (acc proto-judge-acc-p))
-      :returns (mv (new-ttlst ttmrg-list-p) (new-acc proto-judge-acc-p))
-      :measure (ttmrg-list-count (ttmrg-list-fix ttlst))
+	((ttlst tterm-list-p) (acc proto-judge-acc-p))
+      :returns (mv (new-ttlst tterm-list-p) (new-acc proto-judge-acc-p))
+      :measure (tterm-list-count (tterm-list-fix ttlst))
       :flag list
-      (b* ((ttlst (ttmrg-list-fix ttlst))
+      (b* ((ttlst (tterm-list-fix ttlst))
 	   ((proto-judge-acc acc0) (proto-judge-acc-fix acc))
 	   ((unless (consp ttlst)) (mv nil acc0))
 	   ((cons hd tl) ttlst)
@@ -449,33 +449,33 @@ instance of a sub-expression."
   ;   It also causes prolific case splitting.  To manage this, we quarantine
   ;   the case-match in parse-my-equal and process the results of the
   ;   case-match in parese-my-equal-help.
-  (define parse-my-equal-help ((js nat-ttmrg-alist-p) (i natp) (j judge-p))
-    :returns (new-js nat-ttmrg-alist-p)
+  (define parse-my-equal-help ((js nat-tterm-alist-p) (i natp) (j judge-p))
+    :returns (new-js nat-tterm-alist-p)
     :verify-guards nil
-    (b* ((js (nat-ttmrg-alist-fix js))
+    (b* ((js (nat-tterm-alist-fix js))
 	 (i (nfix i))
 	 (j (judge-fix j))
 	 (a (hons-get i js))
 	 ((unless a)
 	  (er acl2::hard? 'parse-my-equal
 	      "Smtlink internal error: bad expr-index, ~x0~%" i))
-	 ((ttmrg tt0) (cdr a))
+	 ((tterm tt0) (cdr a))
 	 (tt1 (if (and (not (set::emptyp tt0.judgements))
 		       (consp (set::head tt0.judgements))
 		       (equal (car (set::head tt0.judgements)) 'my-equal))
-		(change-ttmrg tt0 :judgements nil)
+		(change-tterm tt0 :judgements nil)
 		tt0)))
-      (hons-acons i (ttmrg-add-judge-set tt1 (list j)) js))
+      (hons-acons i (tterm-add-judge-set tt1 (list j)) js))
     ///
     (local (defrule guard-lemma
       (implies (judge-p j) (judge-set-p (list j)))
       :enable judge-set-p))
     (verify-guards parse-my-equal-help))
 
-  (define parse-my-equal ((js nat-ttmrg-alist-p) (x pseudo-termp))
-    :returns (new-js nat-ttmrg-alist-p)
+  (define parse-my-equal ((js nat-tterm-alist-p) (x pseudo-termp))
+    :returns (new-js nat-tterm-alist-p)
     :verify-guards nil
-    (let ((js (nat-ttmrg-alist-fix js)))
+    (let ((js (nat-tterm-alist-fix js)))
       (case-match x
 	(('my-equal ('hide ('cdr ('cons ('quote expr-index) (type-recognizer &)))) ''t)
 	 (if (and (natp expr-index) (symbolp type-recognizer))
@@ -489,27 +489,27 @@ instance of a sub-expression."
     (verify-guards parse-my-equal))
 
 
-  (define delete-empty-judgements ((js nat-ttmrg-alist-p) (keys nat-listp))
+  (define delete-empty-judgements ((js nat-tterm-alist-p) (keys nat-listp))
     :measure (len (acl2::nat-list-fix keys))
-    :returns (new-js nat-ttmrg-alist-p)
-    (b* ((js (nat-ttmrg-alist-fix js))
+    :returns (new-js nat-tterm-alist-p)
+    (b* ((js (nat-tterm-alist-fix js))
 	 (keys (acl2::nat-list-fix keys))
 	 ((unless keys) js)
 	 ((cons hd tl) keys)
 	 (a (hons-get hd js))
 	 ((unless (consp a)) js) ; shouldn't happen
-	 ((ttmrg tt) (cdr a))
+	 ((tterm tt) (cdr a))
 	 (js2 (if (and (consp tt.judgements)
 		       (consp (car tt.judgements))
 		       (equal (caar tt.judgements) 'my-equal))
-		(hons-acons hd (change-ttmrg tt :judgements nil) js)
+		(hons-acons hd (change-tterm tt :judgements nil) js)
 		js)))
       (delete-empty-judgements js2 tl)))
 
-  (define parse-judgements-help ((js nat-ttmrg-alist-p) (x pseudo-termp))
-    :returns (new-js nat-ttmrg-alist-p)
+  (define parse-judgements-help ((js nat-tterm-alist-p) (x pseudo-termp))
+    :returns (new-js nat-tterm-alist-p)
     :verify-guards nil
-    (b* ((js (nat-ttmrg-alist-fix js))
+    (b* ((js (nat-tterm-alist-fix js))
 	 (x (pseudo-term-fix x))
 	 ((unless (equal (acl2::pseudo-term-kind x) :fncall)) js)
 	 ((if (equal (acl2::pseudo-term-fncall->fn x) 'my-equal))
@@ -528,18 +528,18 @@ instance of a sub-expression."
     ///
     (verify-guards parse-judgements-help))
 
-  (define j-alist-keys ((js nat-ttmrg-alist-p))
+  (define j-alist-keys ((js nat-tterm-alist-p))
     :returns (keys nat-listp)
-    :measure (len (nat-ttmrg-alist-fix js))
+    :measure (len (nat-tterm-alist-fix js))
     :short "Like strip-cars without the guard of alistp."
     :long "Alistp implies true-listp, but fast-alists don't satisfy alistp!"
-    (b* ((js (nat-ttmrg-alist-fix js))
+    (b* ((js (nat-tterm-alist-fix js))
 	 ((unless (consp js)) nil)
 	 ((cons hd tl) js))
       (cons (car hd) (j-alist-keys tl))))
 
-  (define parse-judgements ((js nat-ttmrg-alist-p) (x pseudo-termp))
-    :returns (new-js nat-ttmrg-alist-p)
+  (define parse-judgements ((js nat-tterm-alist-p) (x pseudo-termp))
+    :returns (new-js nat-tterm-alist-p)
     (b* ((js1 (parse-judgements-help js x))
 	 (keys (j-alist-keys js1)))
     (fast-alist-clean
@@ -547,17 +547,17 @@ instance of a sub-expression."
 
 (defsection merge-judgements
   :short "Annotate a term with the type-judgements determined by rewrite$."
-  :long  "Emperically, applying rewrite$ to the  ttmrg-correct-expr of a term
+  :long  "Emperically, applying rewrite$ to the  tterm-correct-expr of a term
 returns an if-then-else tree where the conditions are the path-conditions of
 the term.  If an if-condition, then-expression, or else-expression is an
 application of my-equal, we check to see if the unhidden version of the
 type-recognizer call rewrote to 't.  If so, we add that type-judgement
 to the term."
 
-  (define merge-judgements-fetch ((tt-proto ttmrg-p) (j-alist nat-ttmrg-alist-p))
-    :returns (new-tt ttmrg-p)
-    (b* (((ttmrg tt-proto) (ttmrg-fix tt-proto))
-	 (j-alist (nat-ttmrg-alist-fix j-alist))
+  (define merge-judgements-fetch ((tt-proto tterm-p) (j-alist nat-tterm-alist-p))
+    :returns (new-tt tterm-p)
+    (b* (((tterm tt-proto) (tterm-fix tt-proto))
+	 (j-alist (nat-tterm-alist-fix j-alist))
 	 (j1
 	   (if (set::emptyp tt-proto.judgements)
 	     'missing-judgements
@@ -573,7 +573,7 @@ to the term."
 		       (er hard? 'merge-judgements-fetch
 			   "Smtlink, internal error: expr-index not found in j-alist -- expr-index = ~x0"
 			   expr-index))
-		      ((ttmrg tt1) (cdr a)))
+		      ((tterm tt1) (cdr a)))
 		   tt1))
 		('missing-judgements
 		 (er hard? 'merge-judgements-fetch
@@ -586,37 +586,37 @@ to the term."
 
   (defines merge-judgements
     :verify-guards nil
-    (define merge-judgements-term ((tt-proto ttmrg-p)
-				  (j-alist nat-ttmrg-alist-p))
-      :measure (ttmrg-count (ttmrg-fix tt-proto))
-      :returns (new-tt ttmrg-p)
-      (change-ttmrg (merge-judgements-fetch tt-proto j-alist)
-	:guts (merge-judgements-guts (ttmrg->guts tt-proto) j-alist)))
+    (define merge-judgements-term ((tt-proto tterm-p)
+				  (j-alist nat-tterm-alist-p))
+      :measure (tterm-count (tterm-fix tt-proto))
+      :returns (new-tt tterm-p)
+      (change-tterm (merge-judgements-fetch tt-proto j-alist)
+	:guts (merge-judgements-guts (tterm->guts tt-proto) j-alist)))
 
-    (define merge-judgements-guts ((guts ttmrg-guts-p)
-				   (j-alist nat-ttmrg-alist-p))
-      :measure (ttmrg-guts-count (ttmrg-guts-fix guts))
-      :returns (new-guts ttmrg-guts-p)
-      (b* ((guts (ttmrg-guts-fix guts))
-	   (j-alist (nat-ttmrg-alist-fix j-alist)))
-	(ttmrg-guts-case guts
+    (define merge-judgements-guts ((guts tterm-guts-p)
+				   (j-alist nat-tterm-alist-p))
+      :measure (tterm-guts-count (tterm-guts-fix guts))
+      :returns (new-guts tterm-guts-p)
+      (b* ((guts (tterm-guts-fix guts))
+	   (j-alist (nat-tterm-alist-fix j-alist)))
+	(tterm-guts-case guts
 	  :var guts
 	  :quote guts
 	  :if
-	    (change-ttmrg-guts-if guts
+	    (change-tterm-guts-if guts
 	      :condx (merge-judgements-term guts.condx j-alist)
 	      :thenx (merge-judgements-term guts.thenx j-alist)
 	      :elsex (merge-judgements-term guts.elsex j-alist))
 	  :fncall
-	    (change-ttmrg-guts-fncall guts
+	    (change-tterm-guts-fncall guts
 	      :args (merge-judgements-args guts.args j-alist))))
     )
 
-    (define merge-judgements-args ((args-proto ttmrg-list-p)
-				   (j-alist nat-ttmrg-alist-p))
-      :measure (ttmrg-list-count (ttmrg-list-fix args-proto))
-      :returns (new-ttlst ttmrg-list-p)
-      (b* ((args-proto (ttmrg-list-fix args-proto))
+    (define merge-judgements-args ((args-proto tterm-list-p)
+				   (j-alist nat-tterm-alist-p))
+      :measure (tterm-list-count (tterm-list-fix args-proto))
+      :returns (new-ttlst tterm-list-p)
+      (b* ((args-proto (tterm-list-fix args-proto))
 	   ((unless args-proto) nil)
 	   ((cons hd tl) args-proto))
 	(cons (merge-judgements-term hd j-alist)
@@ -631,14 +631,14 @@ to the term."
   (b* ((expr (pseudo-term-fix expr))
        (recognizers (symbol-list-fix recognizers))
        ((proto-judge-acc acc) (make-proto-judge-acc :recognizers recognizers))
-       (tt1 (ttmrg-propagate-path-cond-term
-	      (make-ttmrg-trivial expr) nil state)))
+       (tt1 (tterm-propagate-path-cond-term
+	      (make-tterm-trivial expr) nil state)))
     (with-fast-alist acc.j-alist
       (b* (((mv tt2 acc2)
 	    (proto-judgements-term tt1 acc))
-	   ((unless (termp (ttmrg-correct-expr tt2) (w state)))
-	    (er soft 'type-inference-rw "(termp (ttmrg-correct-expr xpre) (w state)) -> nil~%"))
-	   (cx2 (acl2::beta-reduce-pseudo-termp (ttmrg-correct-expr tt2)))
+	   ((unless (termp (tterm-correct-expr tt2) (w state)))
+	    (er soft 'type-inference-rw "(termp (tterm-correct-expr xpre) (w state)) -> nil~%"))
+	   (cx2 (acl2::beta-reduce-pseudo-termp (tterm-correct-expr tt2)))
 	   ((mv erp cx2-rw state)
 	    (rewrite$-helper cx2 nil nil state))
 	   ((if erp)
@@ -713,19 +713,19 @@ to the term."
          ((unless (consp hint)) (mv t nil state))
          ((cons smt-hint tterm) hint)
          ((unless (smtlink-hint-p smt-hint)) (mv t nil state))
-         ((unless (ttmrg-p tterm)) (mv t nil state))
-	 ((unless (equal (ttmrg->expr tterm) goal))
+         ((unless (tterm-p tterm)) (mv t nil state))
+	 ((unless (equal (tterm->expr tterm) goal))
 	  (prog2$
 	    (cw "type-judge-bottom-up-cp: tterm.expr doesn't match goal.~%  goal: ~x0~%  tterm.expr: ~x1~%"
-		goal (ttmrg->expr tterm))
+		goal (tterm->expr tterm))
 	    (mv t nil state)))
 	 (next-cp (cdr (assoc-equal 'type-judge-bottom-up *SMT-architecture*)))
 	 ((if (null next-cp)) (mv t nil state))
-	 (new-cl (ttmrg-clause tterm))
+	 (new-cl (tterm-clause tterm))
 	 (the-hint `(:clause-processor (,next-cp clause ',smt-hint state)))
 	 (hinted-goal `((hint-please ',the-hint) ,new-cl))
 	 ;; Side condition
-	 (side-condition (ttmrg-correct-expr tterm))
+	 (side-condition (tterm-correct-expr tterm))
 	 ; might add a theory hint based on the rules used by rewrite$, or
 	 ;   allow hints from the (advanced?) user.
 	 )
@@ -772,8 +772,8 @@ to the term."
     (b* (((proto-judge-acc acc)
 	  (make-proto-judge-acc
 	    :recognizers '(booleanp integerp natp nat-sym-alist-p)))
-	 (tt1 (ttmrg-propagate-path-cond-term
-		(make-ttmrg-trivial expr) nil state)))
+	 (tt1 (tterm-propagate-path-cond-term
+		(make-tterm-trivial expr) nil state)))
       (with-fast-alist acc.j-alist
 	(proto-judgements-term tt1 acc))))
 
@@ -787,9 +787,9 @@ to the term."
 	  ((if erp)
 	   (prog2$ (cw "type-inference-rw failed~%")
 		   (mv erp tterm state)))
-	  ((unless (ttmrg-p tterm))
+	  ((unless (tterm-p tterm))
 	   (er soft 'rw-test
-	       "type-inference-rw should return (mv nil x state) where (ttmrg-p x))~%  but x is not a ttmrg-p~%  x = ~x0~%"
+	       "type-inference-rw should return (mv nil x state) where (tterm-p x))~%  but x is not a tterm-p~%  x = ~x0~%"
 	       tterm))
 	  (- (cw "tterm = ~%"))
 	  (- (show-ttermx tterm "  ")))
