@@ -43,7 +43,7 @@ where the system books are."))
     (make-smtlink-config :interface-dir interface-dir
                          :smt-module "ACL2_to_Z3"
                          :smt-class "ACL22SMT"
-                         :smt-cmd "python"
+                         :smt-cmd "z3 -smt2"
                          :pythonpath "")))
 
 ;; -----------------------------------------------------------------

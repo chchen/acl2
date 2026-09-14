@@ -21,6 +21,7 @@
 (include-book "std/util/defprojection" :dir :system)
 (include-book "xdoc/top" :dir :system)
 
+(include-book "../config")
 (include-book "../verified/basics")
 (include-book "../verified/hint-interface")
 (include-book "../verified/smt-judgement")
@@ -384,8 +385,9 @@
 
   (defttag smtlink-smtlib)
 
-  (define check-sat-with-z3 ((script true-listp)
-                             state)
+  (define check-sat ((script true-listp)
+                     (solver-cmd stringp)
+                     state)
     :returns (mv (err booleanp)
                  (rv symbolp)
                  state)
@@ -404,7 +406,8 @@
                                         state))
          ((unless (null erp))
           (check-sat-error "tempfile-io" nil state))
-         (cmdstr (concatenate 'string "/opt/homebrew/bin/z3 -smt2 " file-name))
+         (solver-cmd (str-fix solver-cmd))
+         (cmdstr (concatenate 'string solver-cmd " " file-name))
          ((mv status lines state) (tshell-call cmdstr :print nil :save t))
          ((unless (= status 0))
           (check-sat-error "solver" lines state)))
@@ -420,6 +423,11 @@
          ((unless (consp hint)) (mv t nil state))
          ((cons smt-hint simp-expr) hint)
          ((unless (smtlink-hint-p smt-hint)) (mv t nil state))
+         (smt-config (smt-config-fix
+                       (smtlink-hint->configurations smt-hint)))
+         (smtlink-config (smtlink-config-fix
+                           (smt-config->smt-cnf smt-config)))
+         (solver-cmd (smtlink-config->smt-cmd smtlink-config))
          ((unless (pseudo-termp simp-expr)) (mv t nil state))
          (goal (disjoin cl))
          ((mv fail smt-j) (smt-judgement-clause->judgement goal))
@@ -430,7 +438,7 @@
          (smt-script (append (smt-judgement->preamble smt-j)
                              (smt-assert-negation simp-expr)))
          ((mv fail solver-result state)
-          (check-sat-with-z3 smt-script state))
+          (check-sat smt-script solver-cmd state))
          ((if fail) (mv t nil state))
          ((unless (equal solver-result :unsat))
           (value (list nil)))

@@ -1,1 +1,1 @@
-smt-cmd=python
+smt-cmd="z3 -smt2"
