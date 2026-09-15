@@ -22,11 +22,7 @@ doc:
 	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) doc
 
 example:
-	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) examples/examples.lisp
-
-ttmrg:
-	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) trusted/smt-lib.lisp
-
+	$(ACL2_BUILD_DIR)/cert.pl -j $(JOBS) -a $(ACL2) -b $(ACL2_SYSTEM_BOOKS) examples/smtlink3-examples.lisp
 
 clean:
 	$(ACL2_BUILD_DIR)/clean.pl

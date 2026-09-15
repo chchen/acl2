@@ -1,1 +1,1 @@
-smt-cmd="z3 -smt2"
+smt-cmd=z3

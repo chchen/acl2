@@ -407,7 +407,7 @@
          ((unless (null erp))
           (check-sat-error "tempfile-io" nil state))
          (solver-cmd (str-fix solver-cmd))
-         (cmdstr (concatenate 'string solver-cmd " " file-name))
+         (cmdstr (concatenate 'string solver-cmd " -smt2 " file-name))
          ((mv status lines state) (tshell-call cmdstr :print nil :save t))
          ((unless (= status 0))
           (check-sat-error "solver" lines state)))
