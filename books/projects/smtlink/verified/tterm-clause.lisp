@@ -8,6 +8,7 @@
 (in-package "SMT")
 
 (include-book "tterm")
+(include-book "std/util/defprojection" :dir :system)
 
 (set-state-ok t)
 (set-induction-depth-limit 1)
@@ -133,3 +134,58 @@
     :in-theory (e/d (tterm-clause
                      ev-smtcp-tterm-clause-equivalent)
                     (tterm-parse-clause-of-tterm-clause))))
+
+
+(std::defprojection tterms->tterm-clauses ((x tterm-list-p))
+  :returns (rv pseudo-term-listp)
+  (tterm-clause x)
+  ///
+  (defrule eval-disjoin-tterm-clauses-implies-disjoin-tterm-expr-list
+    (implies (and (tterm-list-p tterms)
+                  (tterm-list-correct-p tterms a)
+                  (ev-smtcp (disjoin (tterms->tterm-clauses tterms)) a))
+             (ev-smtcp (disjoin (tterm-list->expr-list tterms)) a))
+    :hints (("Goal" :induct (len tterms))))
+  (defrule eval-disjoin-tterm-expr-list-implies-eval-disjoin-tterm-clauses
+    (implies (ev-smtcp (disjoin (tterm-list->expr-list tterms)) a)
+             (ev-smtcp (disjoin (tterms->tterm-clauses tterms)) a))
+    :hints (("Goal" :induct (len tterms)))))
+
+; (tterm-parse-clause2 cl) -> (mv fail tterm)
+(define tterm-parse-clause2 ((cl pseudo-term-listp))
+  :returns (mv (fail booleanp) (tterm tterm-list-p))
+  (b* (((unless (pseudo-term-listp cl)) (mv t (list (make-tterm))))
+       ((unless (consp cl)) (mv nil nil))
+       ((mv fail head-tterm) (tterm-parse-clause (car cl)))
+       ((if fail) (mv t (list (make-tterm))))
+       ((mv fail tail-tterms) (tterm-parse-clause2 (cdr cl)))
+       ((if fail) (mv t (list (make-tterm)))))
+    (mv nil (cons head-tterm tail-tterms)))
+  ///
+  (defrule tterm-parse-clause2-of-tterms->tterm-clauses
+    (implies (tterm-list-p tterms)
+             (mv-let
+                 (fail parsed-tterms)
+                 (tterm-parse-clause2 (tterms->tterm-clauses tterms))
+               (and (not fail)
+                    (equal parsed-tterms tterms))))
+    :induct (len tterms))
+  ;; (defrule tterm-parse2-clause-pass
+  ;;   (mv-let
+  ;;       (fail tterms)
+  ;;       (tterm-parse-clause2 cl)
+  ;;     (implies (and (not fail)
+  ;;       	    (ev-smtcp (disjoin (tterm-list->expr-list tterms))
+  ;;       		      a))
+  ;;              (ev-smtcp (disjoin cl) a)))
+  ;;   :in-theory (disable ev-smtcp-of-disjoin))
+  (defrule ev-smtcp-of-tterm-parse-clause2
+    (mv-let (fail tterms)
+            (tterm-parse-clause2 cl)
+      (implies (not fail)
+               (equal (ev-smtcp (disjoin cl) a)
+                      (implies (tterm-list-correct-p tterms a)
+                               (ev-smtcp (disjoin (tterm-list->expr-list
+                                                    tterms)) a)))))
+    :expand (disjoin cl)
+    :in-theory (disable ev-smtcp-of-disjoin)))

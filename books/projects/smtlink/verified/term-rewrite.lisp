@@ -46,6 +46,7 @@
                   (mv t nil state)))
          ((mv rewrite-fail result state)
           (acl2::rewrite$ term
+                          :hands-off '(not)
                           :hyps hyps
                           :in-theory theory))
          ((if rewrite-fail)
@@ -67,6 +68,32 @@
                        (natp fuel)))
           (mv t nil state)))
       (rewrite$-helper-fn term hyps theory fuel state)))
+
+  (define tterm-rewrite$-map (tterms theory state)
+    (b* (((unless (and (tterm-list-p tterms)
+                       (pseudo-termp theory)
+                       (state-p state)))
+          (mv t nil state))
+         ((unless (consp tterms)) (value nil))
+         ;; Simplify correctness condition
+         (head-correct-expr (tterm-correct-smt-expr (car tterms)))
+         ((mv fail hypo state) (rewrite$-helper head-correct-expr
+                                                nil
+                                                theory
+                                                state))
+         ((if fail) (mv t nil state))
+         ;; Rewrite expression
+         (head-expr (tterm->expr (car tterms)))
+         ((mv fail new-head state) (rewrite$-helper head-expr
+                                                    (list hypo)
+                                                    theory
+                                                    state))
+         ((if fail) (mv t nil state))
+         ((mv fail new-tail state) (tterm-rewrite$-map (cdr tterms)
+                                                       theory
+                                                       state))
+         ((if fail) (mv t nil state)))
+      (value (cons new-head new-tail))))
 
   (define SMT-term-rewrite-hint (cl kwd-alist state)
     :guard-debug t
@@ -92,74 +119,141 @@
                   (value nil)))
          (smt-hint (unquote q-smt-hint))
          (translation-theory (smtlink-hint->translation-theory smt-hint))
-         (goal (disjoin cl))
-         ((mv fail tterm) (tterm-parse-clause goal))
-         ((if fail) (prog2$ (cw "not a tterm-clause: ~x0~%" tterm)
+         ;; Clause rewriting follows
+         ((mv fail tterms) (tterm-parse-clause2 cl))
+         ((if fail) (prog2$ (cw "not a list of tterm-clauses: ~x0~%" tterms)
                             (value nil)))
-         (expr (tterm->expr tterm))
-         (correct-smt-exprs (list (tterm-correct-smt-expr tterm)))
-         ((mv fail new-expr state)
-          (rewrite$-helper expr
-                           correct-smt-exprs
-                           translation-theory
-                           state))
-         ((if fail) (value nil)))
-      (prog2$ (cw "SMT-term-rewrite-hint orig: ~x0 new: ~x1~%"
-                  expr
-                  new-expr)
-              (value `(:computed-hint-replacement ((SMT-computed-hint clause))
-                       :clause-processor (,next-cp clause ',(cons smt-hint new-expr) state)
-                       ,@kwd-alist-tail)))))
+         ((mv fail new-exprs state)
+          (tterm-rewrite$-map tterms translation-theory state))
+         ((if fail) (value nil))
+         (- (cw "SMT-term-rewrite-hint ~%original: ~x0~%new: ~x1~%"
+                tterms
+                new-exprs)))
+      (value `(:computed-hint-replacement ((SMT-computed-hint clause))
+               :clause-processor (,next-cp clause ',(cons smt-hint new-exprs) state)
+               ,@kwd-alist-tail))))
 
   (logic)
 
 
+  (define tterms-exprs->side-goals ((original-tts tterm-list-p)
+                                    (new-exprs pseudo-term-listp)
+                                    (trans-theory pseudo-termp))
+    :measure (+ (len (tterm-list-fix original-tts))
+                (len (pseudo-term-list-fix new-exprs)))
+    :returns (side-goals true-listp)
+    (b* ((original-tts (tterm-list-fix original-tts))
+         (new-exprs (pseudo-term-list-fix new-exprs))
+         (trans-theory (pseudo-term-fix trans-theory))
+         ((unless (and (consp original-tts)
+		       (consp new-exprs)))
+	  nil)
+         (original-tt (car original-tts))
+         (original-expr (tterm->expr original-tt))
+         (new-expr (car new-exprs))
+         (original-correct-expr (tterm-correct-expr original-tt))
+         (side-condition (implies-expr original-correct-expr
+				       (equal-expr original-expr
+                                                   new-expr)))
+         (side-hint `(acl2::hint-wrapper
+		       '(:in-theory ,trans-theory)))
+         (side-goal `((not ,side-hint)
+		      ,side-condition)))
+      (cons side-goal
+	    (tterms-exprs->side-goals (cdr original-tts)
+				      (cdr new-exprs)
+				      trans-theory)))
+    ///
+    (local
+     (acl2::defruled correctness-of-side-condition
+       (implies (and (tterm-correct-p tt a)
+		     (ev-smtcp (implies-expr (tterm-correct-expr tt)
+					     (equal-expr (tterm->expr tt)
+							 new-expr))
+			       a))
+		(iff (ev-smtcp (tterm->expr tt) a)
+		     (ev-smtcp new-expr a)))
+       :in-theory (enable equal-expr
+			  implies-expr)))
+    (local
+     (acl2::defruled tterms-exprs-correctness-base-case-0
+       (implies (and (pseudo-term-listp new-exprs)
+		     (equal 0 (len new-exprs)))
+		(not (acl2::or-list (ev-smtcp-lst new-exprs a))))))
+
+    (local
+     (acl2::defruled tterms-exprs-correctness-base-case-1
+       (implies
+	 (and (tterm-list-p original-tts)
+	      (tterm-list-correct-p original-tts a)
+	      (equal (len original-tts) 0))
+	 (not (acl2::or-list (ev-smtcp-lst
+                               (tterm-list->expr-list original-tts)
+			       a))))))
+
+    (defrule correctness-of-tterms-exprs->side-goals
+	  (implies (and (tterm-list-p original-tts)
+			(tterm-list-correct-p original-tts a)
+			(pseudo-term-listp new-exprs)
+			(equal (len original-tts)
+			       (len new-exprs))
+			(ev-smtcp (conjoin-clauses
+				   (tterms-exprs->side-goals
+				    original-tts
+				    new-exprs
+				    trans-theory))
+	                          a))
+		   (iff (ev-smtcp (disjoin (tterm-list->expr-list original-tts))
+				  a)
+			(ev-smtcp (disjoin new-exprs) a)))
+	  :in-theory (enable correctness-of-side-condition
+                             tterms-exprs-correctness-base-case-0
+			     tterms-exprs-correctness-base-case-1)))
+
+
   ;; Clause processors
-  ;; If rewritten term = original tterm->expr, continue as if 'term-rewrite
-  ;; Reinjects rewritten term as if it came from 'process-hint
+  ;; If rewritten clauses = original tterm-list->expr-list, continue to next
+  ;; clause processor.
+  ;; If the clause changed, reinject after 'process-hint
   ;; Discharge equality side condition with hint from translation-theory
   (define term-rewrite-cp ((cl pseudo-term-listp)
                            (hint t)
                            state)
     (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
          ((unless (consp hint)) (mv t nil state))
-         ((cons smt-hint new-expr) hint)
+         ((cons smt-hint new-cl) hint)
          ((unless (smtlink-hint-p smt-hint)) (mv t nil state))
-         ((unless (pseudo-termp new-expr)) (mv t nil state))
-         (goal (disjoin cl))
-         ((mv fail tterm) (tterm-parse-clause goal))
+         ((unless (pseudo-term-listp new-cl)) (mv t nil state))
+         ((mv fail tterms) (tterm-parse-clause2 cl))
          ((if fail) (mv t nil state))
-         (orig-expr (tterm->expr tterm))
-         (orig-correct-expr (tterm-correct-expr tterm)))
-      (if (equal orig-expr new-expr)
-          (prog2$ (cw "term-rewrite-cp: rewrite$ did not change term~%")
+         ((unless (= (len new-cl) (len tterms)))
+          (mv t nil state))
+         (orig-exprs (tterm-list->expr-list tterms)))
+      (if (equal orig-exprs new-cl)
+          (prog2$ (cw "term-rewrite-cp: rewrite$ did not change clause~%")
                   (b* ((next-cp (cdr (assoc-equal 'term-rewrite
                                                   *SMT-architecture*)))
                        ((if (null next-cp)) (mv t nil state))
                        (the-hint
-                         `(:clause-processor (,next-cp clause ',smt-hint state)))
-                       (new-cl (tterm-clause tterm))
-                       (hinted-goal `((hint-please ',the-hint) ,new-cl)))
+                         `(:clause-processor (,next-cp clause ',smt-hint
+                                                       state)))
+                       (hinted-goal `((hint-please ',the-hint) ,@cl)))
                     (value (list hinted-goal))))
-        (prog2$ (cw "term-rewrite-cp: feeding new term back into pipeline~%")
+        (prog2$ (cw "term-rewrite-cp: feeding new clause back into pipeline~%")
                 (b* ((next-cp (cdr (assoc-equal 'process-hint
                                                 *SMT-architecture*)))
                      ((if (null next-cp)) (mv t nil state))
                      (the-hint
-                         `(:clause-processor (,next-cp clause ',smt-hint state)))
-                     (hinted-goal `((hint-please ',the-hint) ,new-expr))
-                     ;; Side condition
-                     (side-condition (implies-expr orig-correct-expr
-                                                   (equal-expr
-                                                     orig-expr
-                                                     new-expr)))
-                     (side-hint `(acl2::hint-wrapper
-                                   '(:in-theory
-                                     ,(smtlink-hint->translation-theory smt-hint))))
-                     (hinted-goal2 `((not ,side-hint)
-                                     ,side-condition)))
-                  (value (list hinted-goal
-                               hinted-goal2)))))))
+                       `(:clause-processor (,next-cp clause ',smt-hint state)))
+                     ;; New goals and side conditions
+                     (trans-theory (smtlink-hint->translation-theory smt-hint))
+                     (side-goals
+                       (tterms-exprs->side-goals tterms
+                                                 new-cl
+                                                 trans-theory))
+                     (hinted-new-goal `((hint-please ',the-hint) ,@new-cl)))
+                  (value (cons hinted-new-goal side-goals)))))))
+
 
   (defrule correctness-of-term-rewrite-cp
     (implies (and (pseudo-term-listp cl)
@@ -174,5 +268,4 @@
     :expand (term-rewrite-cp cl hint state)
     :in-theory (disable ev-smtcp-of-disjoin)
     :rule-classes :clause-processor)
-
   )

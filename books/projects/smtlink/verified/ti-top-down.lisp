@@ -1098,22 +1098,53 @@
                    (make-tterm-trivial nil)))))
 
 
+(define map-top-down ((tterms tterm-list-p)
+                      (options type-options-p)
+                      (state t))
+  :measure (tterm-list-count tterms)
+  :returns (rv tterm-list-p)
+  (b* ((tterms (tterm-list-fix tterms))
+       (options (type-options-fix options)))
+    (if (consp tterms)
+        (cons (refine-tterm-wrapper (car tterms) options state)
+              (map-top-down (cdr tterms) options state))
+      nil))
+  ///
+  (fty::deffixequiv map-top-down)
+  (defrule map-top-down-preserves-expr-eval-backwards
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+        	  (alistp a)
+        	  (tterm-list-p tterms)
+        	  (ev-smtcp (disjoin (tterm-list->expr-list
+        			       (map-top-down tterms opts state)))
+        		    a))
+             (ev-smtcp (disjoin (tterm-list->expr-list tterms)) a))
+    :in-theory (disable ev-smtcp-of-disjoin))
+  (defrule map-top-down-preserves-correct-p-forwards
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (alistp a)
+                  (tterm-list-p tterms)
+                  (tterm-list-correct-p tterms a))
+             (tterm-list-correct-p (map-top-down tterms opts state)
+        			   a))))
+
+
 (define type-judge-top-down-cp ((cl pseudo-term-listp)
                                 (hint t)
                                 state)
   (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
        ((unless (smtlink-hint-p hint)) (mv t nil state))
-       (goal (disjoin cl))
-       ((mv fail tterm) (tterm-parse-clause goal))
+       ((mv fail tterms) (tterm-parse-clause2 cl))
        ((if fail) (mv t nil state))
        (next-cp (cdr (assoc-equal 'type-judge-top-down *SMT-architecture*)))
        ((if (null next-cp)) (mv t nil state))
-       (type-opt (construct-type-options hint goal))
-       (new-tt (refine-tterm-wrapper tterm type-opt state))
+       (type-opt (construct-type-options hint (disjoin cl)))
+       (new-tts (map-top-down tterms type-opt state))
+       (- (cw "Top-down tterms:~%~x0~%" new-tts))
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
-       (new-cl (tterm-clause new-tt))
-       (hinted-goal `((hint-please ',the-hint) ,new-cl)))
+       (new-cl (tterms->tterm-clauses new-tts))
+       (hinted-goal `((hint-please ',the-hint) ,@new-cl)))
     (value (list hinted-goal))))
 
 
@@ -1127,13 +1158,13 @@
                       (type-judge-top-down-cp cl hint state)))
                   a))
            (ev-smtcp (disjoin cl) a))
-  :do-not-induct t
-  :expand ((type-judge-top-down-cp cl hint state))
+  :in-theory (disable ev-smtcp-of-disjoin)
+  :expand (type-judge-top-down-cp cl hint state)
   :use ((:functional-instance
-          correctness-of-tterm-trans-fn-cp
+          correctness-of-tterm-map-fn-cp
+          (tterm-map-fn-cp type-judge-top-down-cp)
+          (tterm-map-fn map-top-down)
           (tterm-trans-fn refine-tterm-wrapper)
           (env-trans-fn (lambda (x) x))
-          (current-cp-fn (lambda () 'type-judge-top-down))
-          (tterm-trans-fn-cp type-judge-top-down-cp)))
-  :in-theory (disable ev-smtcp-of-disjoin)
+          (current-cp-fn (lambda () 'type-judge-top-down))))
   :rule-classes :clause-processor)

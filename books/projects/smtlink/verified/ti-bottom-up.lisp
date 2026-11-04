@@ -11,6 +11,7 @@
 (include-book "clause-processors/pseudo-term-fty" :dir :system)
 ;(include-book "kestrel/fty/symbol-pseudoterm-alist" :dir :system)
 (include-book "misc/beta-reduce" :dir :system)
+(include-book "std/util/defprojection" :dir :system)
 (include-book "tools/rewrite-dollar" :dir :system)
 (include-book "tools/easy-simplify" :dir :system)
 ;(include-book "tterm-clause-cp")
@@ -625,10 +626,12 @@ to the term."
     (verify-guards merge-judgements-term)))
 
 (define type-inference-rw ((expr pseudo-termp)
+                           (hyps pseudo-term-listp)
 			   (recognizers symbol-listp)
 			   (state state-p))
   :mode :program
   (b* ((expr (pseudo-term-fix expr))
+       (hyps (pseudo-term-list-fix hyps))
        (recognizers (symbol-list-fix recognizers))
        ((proto-judge-acc acc) (make-proto-judge-acc :recognizers recognizers))
        (tt1 (tterm-propagate-path-cond-term
@@ -640,7 +643,7 @@ to the term."
 	    (er soft 'type-inference-rw "(termp (tterm-correct-expr xpre) (w state)) -> nil~%"))
 	   (cx2 (acl2::beta-reduce-pseudo-termp (tterm-correct-expr tt2)))
 	   ((mv erp cx2-rw state)
-	    (rewrite$-helper cx2 nil nil state))
+	    (rewrite$-helper cx2 hyps nil state))
 	   ((if erp)
 	    (prog2$
 	      (cw "rewrite$-helper failed: erp=~x0, cx2-rw=~x1~%" erp cx2-rw)
@@ -658,6 +661,34 @@ to the term."
        ((cons hd tl) datatypes))
     (cons (smt-function->name (smt-datatype->recognizer hd))
 	  (smt-recognizers tl))))
+
+(std::defprojection negate-list ((x pseudo-term-listp))
+  :returns (not-x pseudo-term-listp)
+  (negate x))
+
+(define type-inference-rw-clause ((clause pseudo-term-listp)
+                                  (whole-clause pseudo-term-listp)
+                                  (recognizers symbol-listp)
+                                  (state state-p))
+  :mode :program
+  (b* ((clause (pseudo-term-list-fix clause))
+       (whole-clause (pseudo-term-list-fix whole-clause))
+       (recognizers (symbol-list-fix recognizers)))
+    (if (consp clause)
+        (b* ((term-to-infer (car clause))
+             (hypotheses (negate-list (remove term-to-infer whole-clause)))
+             ((mv err tterm state) (type-inference-rw term-to-infer
+                                                      hypotheses
+                                                      recognizers
+                                                      state))
+             ((if err) (mv err tterm state))
+             ((mv err tterms state) (type-inference-rw-clause (cdr clause)
+                                                              whole-clause
+                                                              recognizers
+                                                              state))
+             ((if err) (mv err tterms state)))
+          (value (cons tterm tterms)))
+      (value nil))))
 
 (define smt-type-judge-bottom-up-hint (cl kwd-alist state)
     :guard-debug t
@@ -697,39 +728,42 @@ to the term."
                   (value nil)))
          (smt-hint (unquote q-smt-hint))
          (recognizers (smt-recognizers (smtlink-hint->datatypes smt-hint)))
-         (goal (disjoin cl))
-	 ((mv fail tterm state) (type-inference-rw goal recognizers state))
+	 ((mv fail tterms state) (type-inference-rw-clause cl cl recognizers state))
          ((if fail) (value nil)))
-      (prog2$ (cw "smt-type-judge-bottom-up-hint~%  goal: ~x0~%  tterm: ~x1~%"
-                  goal
-                  tterm)
+      (prog2$ (cw "smt-type-judge-bottom-up-hint~%  clause: ~x0~%  tterms: ~x1~%"
+                  cl
+                  tterms)
               (value `(:computed-hint-replacement ((smt-computed-hint clause))
-                       :clause-processor (,next-cp clause ',(cons smt-hint tterm) state)
+                       :clause-processor (,next-cp clause ',(cons smt-hint tterms) state)
                        ,@kwd-alist-tail)))))
 
 (define type-judge-bottom-up-cp ((cl pseudo-term-listp) (hint t) state)
     (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
-         (goal (disjoin cl))
          ((unless (consp hint)) (mv t nil state))
-         ((cons smt-hint tterm) hint)
+         ((cons smt-hint tterms) hint)
          ((unless (smtlink-hint-p smt-hint)) (mv t nil state))
-         ((unless (tterm-p tterm)) (mv t nil state))
-	 ((unless (equal (tterm->expr tterm) goal))
+         ((unless (tterm-list-p tterms)) (mv t nil state))
+         (expr-list (tterm-list->expr-list tterms))
+	 ((unless (equal cl expr-list))
 	  (prog2$
-	    (cw "type-judge-bottom-up-cp: tterm.expr doesn't match goal.~%  goal: ~x0~%  tterm.expr: ~x1~%"
-		goal (tterm->expr tterm))
+	    (cw "type-judge-bottom-up-cp: tterms don't correspond to clause.~%
+                 clause: ~x0~%  expr-list: ~x1~%"
+                cl
+                expr-list)
 	    (mv t nil state)))
 	 (next-cp (cdr (assoc-equal 'type-judge-bottom-up *SMT-architecture*)))
 	 ((if (null next-cp)) (mv t nil state))
-	 (new-cl (tterm-clause tterm))
+	 (new-cl (tterms->tterm-clauses tterms))
 	 (the-hint `(:clause-processor (,next-cp clause ',smt-hint state)))
-	 (hinted-goal `((hint-please ',the-hint) ,new-cl))
+	 (hinted-goal `((hint-please ',the-hint) ,@new-cl))
 	 ;; Side condition
-	 (side-condition (tterm-correct-expr tterm))
+         (side-condition (tterm-list-correct-expr tterms))
+         (- (cw "side condition: ~x0~%"
+                (cons side-condition cl)))
 	 ; might add a theory hint based on the rules used by rewrite$, or
 	 ;   allow hints from the (advanced?) user.
 	 )
-      (value (list (list side-condition) hinted-goal))))
+      (value (list (cons side-condition cl) hinted-goal))))
 
 (defrule correctness-of-type-judge-bottom-up-cp
     (implies (and (pseudo-term-listp cl)
@@ -783,7 +817,7 @@ to the term."
 
   (define rw-test-fn ((expr pseudo-termp))
     `(b* ((recognizers '(booleanp integerp natp nat-sym-alist-p))
-	  ((mv erp tterm state) (type-inference-rw ,expr recognizers state))
+	  ((mv erp tterm state) (type-inference-rw ,expr nil recognizers state))
 	  ((if erp)
 	   (prog2$ (cw "type-inference-rw failed~%")
 		   (mv erp tterm state)))

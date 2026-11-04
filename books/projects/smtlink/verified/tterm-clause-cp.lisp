@@ -11,6 +11,8 @@
 (include-book "tterm-clause")
 (include-book "tterm-triv")
 (include-book "type-options")
+(include-book "std/util/defprojection" :dir :system)
+
 
 (set-state-ok t)
 (set-induction-depth-limit 1)
@@ -31,38 +33,71 @@
 ;; Define correctness properties for tterm-clause processors
 (encapsulate
     (((tterm-trans-fn * * state) => *)
+     ((tterm-map-fn * * state) => *)
      ((env-trans-fn *) => *)
      ((current-cp-fn) => *))
 
-  (local (defun tterm-trans-fn (tterm opts state)
+  (local
+    (defun tterm-trans-fn (tterm opts state)
            (declare (ignore opts state))
            (tterm-fix tterm)))
 
-  (local (defun env-trans-fn (a)
-           a))
+  (local
+    (defun tterm-map-fn (tterms opts state)
+      (declare (xargs :measure (tterm-list-count tterms)))
+      (b* ((tterms (tterm-list-fix tterms)))
+        (if (consp tterms)
+            (cons (tterm-trans-fn (car tterms) opts state)
+                  (tterm-map-fn (cdr tterms) opts state))
+          nil))))
 
-  (local (defun current-cp-fn ()
-           'process-hint))
+  (local
+    (defun env-trans-fn (a)
+      a))
 
-  (defthm symbolp-of-current-cp-fn
+  (local
+    (defun current-cp-fn ()
+      'process-hint))
+
+  (defrule symbolp-of-current-cp-fn
     (symbolp (current-cp-fn)))
 
-  (defthm tterm-p-of-tterm-trans-fn
+  (defrule tterm-p-of-tterm-trans-fn
     (tterm-p (tterm-trans-fn tterm opts state)))
 
-  (defthm tterm-trans-fn-preserves-expr-eval-backwards
+  (defrule tterm-trans-fn-preserves-expr-eval-backwards
     (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a)
                   (ev-smtcp (tterm->expr (tterm-trans-fn tterm opts state))
                             (env-trans-fn a)))
              (ev-smtcp (tterm->expr tterm) a)))
 
-  (defthm tterm-trans-fn-preserves-correct-p-forwards
+  (defrule tterm-trans-fn-preserves-correct-p-forwards
     (implies (and (ev-smtcp-meta-extract-global-facts)
                   (alistp a)
                   (tterm-correct-p tterm a))
              (tterm-correct-p (tterm-trans-fn tterm opts state)
-                              (env-trans-fn a)))))
+                              (env-trans-fn a))))
+
+  (defrule tterm-list-p-of-tterm-map-fn
+    (tterm-list-p (tterm-map-fn tterms opts state)))
+
+  (defrule tterm-map-fn-preserves-expr-eval-backwards
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+		  (alistp a)
+		  (tterm-list-p tterms)
+		  (ev-smtcp (disjoin (tterm-list->expr-list
+				       (tterm-map-fn tterms opts state)))
+			    (env-trans-fn a)))
+	     (ev-smtcp (disjoin (tterm-list->expr-list tterms)) a)))
+
+  (defrule tterm-map-fn-preserves-correct-p-forwards
+    (implies (and (ev-smtcp-meta-extract-global-facts)
+                  (alistp a)
+	          (tterm-list-p tterms)
+                  (tterm-list-correct-p tterms a))
+             (tterm-list-correct-p (tterm-map-fn tterms opts state)
+				   (env-trans-fn a)))))
 
 
 (define tterm-trans-fn-cp ((cl pseudo-term-listp)
@@ -96,6 +131,40 @@
            (ev-smtcp (disjoin cl) a))
   :do-not-induct t
   :expand (tterm-trans-fn-cp cl hint state)
+  :in-theory (disable ev-smtcp-of-disjoin)
+  :rule-classes :clause-processor)
+
+
+(define tterm-map-fn-cp ((cl pseudo-term-listp)
+                               (hint t)
+                               state)
+  (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
+       ((unless (smtlink-hint-p hint)) (mv t nil state))
+       ((mv fail tterms) (tterm-parse-clause2 cl))
+       ((if fail) (mv t nil state))
+       (next-cp (cdr (assoc-equal (current-cp-fn) *SMT-architecture*)))
+       ((if (null next-cp)) (mv t nil state))
+       (type-opt (construct-type-options hint (disjoin cl)))
+       (new-tts (tterm-map-fn tterms type-opt state))
+       (the-hint
+         `(:clause-processor (,next-cp clause ',hint state)))
+       (new-cl (tterms->tterm-clauses new-tts))
+       (hinted-goal `((hint-please ',the-hint) ,@new-cl)))
+    (value (list hinted-goal))))
+
+
+(defrule correctness-of-tterm-map-fn-cp
+  (implies (and (ev-smtcp-meta-extract-global-facts)
+                (pseudo-term-listp cl)
+                (alistp a)
+                (ev-smtcp
+                  (conjoin-clauses
+                    (acl2::clauses-result
+                      (tterm-map-fn-cp cl hint state)))
+                  (env-trans-fn a)))
+           (ev-smtcp (disjoin cl) a))
+  :do-not-induct t
+  :expand (tterm-map-fn-cp cl hint state)
   :in-theory (disable ev-smtcp-of-disjoin)
   :rule-classes :clause-processor)
 

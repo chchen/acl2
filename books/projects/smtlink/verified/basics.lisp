@@ -53,7 +53,8 @@
 
 ;; current tag . next computed-hint
 (defval *SMT-architecture*
-  '((process-hint              . add-hypo-cp)
+  '((process-hint              . type-judge-bottom-up-cp)
+    ;;(process-hint              . add-hypo-cp)
     (add-hypo                  . expand-cp)
     (expand                    . reorder-hypotheses-cp)
     (reorder                   . type-judge-bottom-up-cp)
