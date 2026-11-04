@@ -146,14 +146,14 @@
                 thenx-judgements
                 elsex-judgements)))
 
-    (define tterms->var-judgements ((tterms tterm-list-p))
+    (define tterm-list->var-judgements ((tterms tterm-list-p))
       :measure (list (tterm-list->expr-list-count tterms) 1 0)
       :returns (rv var-judgement-list-p)
       :flag list
       (b* ((tterms (tterm-list-fix tterms)))
         (if (consp tterms)
             (append (tterm->var-judgements (car tterms))
-                    (tterms->var-judgements (cdr tterms)))
+                    (tterm-list->var-judgements (cdr tterms)))
           nil)))
 
     (define tterm-fncall->var-judgements ((tterm tterm-p))
@@ -163,7 +163,7 @@
       :flag fncall
       (b* ((tterm (tterm-fix tterm))
            ((unless (mbt (equal (tterm->kind tterm) :fncall))) nil))
-        (tterms->var-judgements (tterm->args tterm))))
+        (tterm-list->var-judgements (tterm->args tterm))))
 
     (define tterm->var-judgements ((tterm tterm-p))
       :measure (list (tterm->expr-count tterm) 3 0)
@@ -189,6 +189,16 @@
   ///
   (fty::deffixequiv tterm->smt-judgement))
 
+
+(define tterm-list->unified-smt-judgement ((tterms tterm-list-p))
+  :returns (rv smt-judgement-p)
+  (b* ((tterms (tterm-list-fix tterms)))
+    (smt-judgement (std::mergesort (tterm-list->var-judgements tterms))
+                   (std::mergesort (tterm-list->fn-judgements tterms))))
+  ///
+  (fty::deffixequiv tterm-list->unified-smt-judgement))
+
+
 (defsection tterm-type-extract-cp
 
   (define tterm-type-extract-cp ((cl pseudo-term-listp)
@@ -196,21 +206,23 @@
                                  state)
     (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
          ((unless (smtlink-hint-p hint)) (mv t nil state))
-         (goal (disjoin cl))
-         ((mv fail tterm) (tterm-parse-clause goal))
+         ;; Parse tterms
+         ((mv fail tterms) (tterm-parse-clause2 cl))
          ((if fail) (mv t nil state))
+         ;; Single-term representation of clause terms
+         (mono-expr (disjoin (tterm-list->expr-list tterms)))
          ;; Goal for next clause processor
-         (expr (tterm->expr tterm))
-         (next-condition (smt-judgement-clause (tterm->smt-judgement tterm)
-                                               expr))
+         (next-expr (smt-judgement-clause
+                      (tterm-list->unified-smt-judgement tterms)
+                      mono-expr))
          (next-cp (cdr (assoc-equal 'tterm-type-extract
                                     *SMT-architecture*)))
          ((if (null next-cp)) (mv t nil state))
          (next-hint
            `(:clause-processor (,next-cp clause ',hint state)))
-         (next-goal `((hint-please ',next-hint) ,next-condition))
+         (next-goal `((hint-please ',next-hint) ,next-expr))
          ;; Side condition
-         (side-goal (list (implies-expr next-condition expr))))
+         (side-goal (list (implies-expr next-expr mono-expr))))
       (value (list next-goal
                    side-goal))))
 

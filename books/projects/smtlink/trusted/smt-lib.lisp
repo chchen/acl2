@@ -29,7 +29,7 @@
 (include-book "../verified/term-rewrite")
 
 (set-state-ok t)
-;;(set-induction-depth-limit 1)
+(set-induction-depth-limit 3)
 (make-event
  (pprogn (set-warnings-as-errors t '("Use") state)
          (value '(value-triple nil))))
@@ -60,7 +60,8 @@
         (cons 'rational-+ 'acl2::|+|)
         (cons 'rational-* 'acl2::|*|)
         (cons 'rational-< 'acl2::|<|)
-        (cons 'rational-/ 'acl2::|/|)))
+        (cons 'rational-/ 'acl2::|/|)
+        (cons 'int-to-rat 'acl2::|to_real|)))
 
 ;; Arrays
 (defconst *SMT-ArraysEx*
