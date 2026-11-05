@@ -357,12 +357,9 @@
                            '(theory 'minimal-theory)
                            state))
          ((if fail) (value nil)))
-      (prog2$ (cw "SMT-expr-simplify-hint orig: ~x0 new: ~x1~%"
-                  expr
-                  new-expr)
-              (value `(:computed-hint-replacement ((SMT-computed-hint clause))
-                       :clause-processor (,next-cp clause ',(cons smt-hint new-expr) state)
-                       ,@kwd-alist-tail)))))
+      (value `(:computed-hint-replacement ((SMT-computed-hint clause))
+               :clause-processor (,next-cp clause ',(cons smt-hint new-expr) state)
+               ,@kwd-alist-tail))))
 
   (logic)
 

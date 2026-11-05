@@ -648,7 +648,6 @@ to the term."
 	    (prog2$
 	      (cw "rewrite$-helper failed: erp=~x0, cx2-rw=~x1~%" erp cx2-rw)
 	      (mv erp cx2-rw state)))
-	   (- (cw "cx2-rw = ~x0~%" cx2-rw))
 	   (j (fast-alist-clean (parse-judgements (proto-judge-acc->j-alist acc2) cx2-rw)))
 	   (tt3 (merge-judgements-term tt2 j)))
 	(value tt3)))))
@@ -691,51 +690,48 @@ to the term."
       (value nil))))
 
 (define smt-type-judge-bottom-up-hint (cl kwd-alist state)
-    :guard-debug t
-    :parents (smt-computed-hints)
-    :short "@('smt::smt-type-judge-bottom-up-hint') WRITE SOMETHING."
-    :mode :program
-    (b* (((unless (and (pseudo-term-listp cl)
-                       (consp kwd-alist)
-                       (consp (cdr kwd-alist))
-                       (consp (cadr kwd-alist))
-                       (= (len (cadr kwd-alist))
-                          4)
-                       (state-p state)))
-          (prog2$ (cw "smt-type-judge-bottom-up-hint: preconditions not met: ~x0~%"
-		      (if (pseudo-term-listp cl)
-                         (if (consp kwd-alist)
-                           (if (consp (cdr kwd-alist))
-			     (if (consp (cadr kwd-alist))
-			       (if (= (len (cadr kwd-alist)) 4)
-				 (if (state-p state)
-				   "all preconditions satisfied?!"
-				   "(not (state-p state))")
-				 "(not (= (len (cadr kwd-alist)) 4))")
-			       "(not (consp (cadr kwd-alist)))")
-			     "(not (consp (cdr kwd-alist)))")
-			   "(not (consp kwd-alist))")
-			 "(not (psuedo-term-listp cl))"))
-                  (value nil)))
-         ((list* cp-kwd (list next-cp & q-smt-hint &) kwd-alist-tail) kwd-alist)
-         ((unless (equal cp-kwd :clause-processor))
-          (prog2$ (cw "smt-type-judge-bottom-up-hint: missing clause processor in kwd-alist: ~x0~%"
-                      kwd-alist)
-                  (value nil)))
-         ((unless (and (quotep q-smt-hint)
-                       (smtlink-hint-p (unquote q-smt-hint))))
-          (prog2$ (cw "not quoted smtlink-hint-p: ~x0~%" q-smt-hint)
-                  (value nil)))
-         (smt-hint (unquote q-smt-hint))
-         (recognizers (smt-recognizers (smtlink-hint->datatypes smt-hint)))
-	 ((mv fail tterms state) (type-inference-rw-clause cl cl recognizers state))
-         ((if fail) (value nil)))
-      (prog2$ (cw "smt-type-judge-bottom-up-hint~%  clause: ~x0~%  tterms: ~x1~%"
-                  cl
-                  tterms)
-              (value `(:computed-hint-replacement ((smt-computed-hint clause))
-                       :clause-processor (,next-cp clause ',(cons smt-hint tterms) state)
-                       ,@kwd-alist-tail)))))
+  :guard-debug t
+  :parents (smt-computed-hints)
+  :short "@('smt::smt-type-judge-bottom-up-hint') WRITE SOMETHING."
+  :mode :program
+  (b* (((unless (and (pseudo-term-listp cl)
+                     (consp kwd-alist)
+                     (consp (cdr kwd-alist))
+                     (consp (cadr kwd-alist))
+                     (= (len (cadr kwd-alist))
+                        4)
+                     (state-p state)))
+        (prog2$ (cw "smt-type-judge-bottom-up-hint: preconditions not met: ~x0~%"
+		    (if (pseudo-term-listp cl)
+                        (if (consp kwd-alist)
+                            (if (consp (cdr kwd-alist))
+			        (if (consp (cadr kwd-alist))
+			            (if (= (len (cadr kwd-alist)) 4)
+				        (if (state-p state)
+				            "all preconditions satisfied?!"
+				          "(not (state-p state))")
+				      "(not (= (len (cadr kwd-alist)) 4))")
+			          "(not (consp (cadr kwd-alist)))")
+			      "(not (consp (cdr kwd-alist)))")
+			  "(not (consp kwd-alist))")
+		      "(not (psuedo-term-listp cl))"))
+                (value nil)))
+       ((list* cp-kwd (list next-cp & q-smt-hint &) kwd-alist-tail) kwd-alist)
+       ((unless (equal cp-kwd :clause-processor))
+        (prog2$ (cw "smt-type-judge-bottom-up-hint: missing clause processor in kwd-alist: ~x0~%"
+                    kwd-alist)
+                (value nil)))
+       ((unless (and (quotep q-smt-hint)
+                     (smtlink-hint-p (unquote q-smt-hint))))
+        (prog2$ (cw "not quoted smtlink-hint-p: ~x0~%" q-smt-hint)
+                (value nil)))
+       (smt-hint (unquote q-smt-hint))
+       (recognizers (smt-recognizers (smtlink-hint->datatypes smt-hint)))
+       ((mv fail tterms state) (type-inference-rw-clause cl cl recognizers state))
+       ((if fail) (value nil)))
+    (value `(:computed-hint-replacement ((smt-computed-hint clause))
+             :clause-processor (,next-cp clause ',(cons smt-hint tterms) state)
+             ,@kwd-alist-tail))))
 
 (define type-judge-bottom-up-cp ((cl pseudo-term-listp) (hint t) state)
     (b* (((unless (pseudo-term-listp cl)) (mv t nil state))
@@ -758,8 +754,6 @@ to the term."
 	 (hinted-goal `((hint-please ',the-hint) ,@new-cl))
 	 ;; Side condition
          (side-condition (tterm-list-correct-expr tterms))
-         (- (cw "side condition: ~x0~%"
-                (cons side-condition cl)))
 	 ; might add a theory hint based on the rules used by rewrite$, or
 	 ;   allow hints from the (advanced?) user.
 	 )

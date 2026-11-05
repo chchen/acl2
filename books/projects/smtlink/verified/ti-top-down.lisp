@@ -1140,7 +1140,6 @@
        ((if (null next-cp)) (mv t nil state))
        (type-opt (construct-type-options hint (disjoin cl)))
        (new-tts (map-top-down tterms type-opt state))
-       (- (cw "Top-down tterms:~%~x0~%" new-tts))
        (the-hint
          `(:clause-processor (,next-cp clause ',hint state)))
        (new-cl (tterms->tterm-clauses new-tts))

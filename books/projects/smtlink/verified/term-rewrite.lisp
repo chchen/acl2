@@ -55,9 +55,7 @@
                   (mv t nil state)))
          ((list new-term & &) result)
          ((if (equal term new-term)) (value new-term)))
-      (prog2$ (cw "rewrite$-helper recurse with fuel ~x0~%"
-                  (1- fuel))
-              (rewrite$-helper-fn new-term hyps theory (1- fuel) state))))
+      (rewrite$-helper-fn new-term hyps theory (1- fuel) state)))
 
   (define rewrite$-helper (term hyps theory state)
     (b* ((fuel (acl2::rewrite-stack-limit (w state)))
@@ -125,10 +123,7 @@
                             (value nil)))
          ((mv fail new-exprs state)
           (tterm-rewrite$-map tterms translation-theory state))
-         ((if fail) (value nil))
-         (- (cw "SMT-term-rewrite-hint ~%original: ~x0~%new: ~x1~%"
-                tterms
-                new-exprs)))
+         ((if fail) (value nil)))
       (value `(:computed-hint-replacement ((SMT-computed-hint clause))
                :clause-processor (,next-cp clause ',(cons smt-hint new-exprs) state)
                ,@kwd-alist-tail))))
@@ -230,29 +225,27 @@
           (mv t nil state))
          (orig-exprs (tterm-list->expr-list tterms)))
       (if (equal orig-exprs new-cl)
-          (prog2$ (cw "term-rewrite-cp: rewrite$ did not change clause~%")
-                  (b* ((next-cp (cdr (assoc-equal 'term-rewrite
-                                                  *SMT-architecture*)))
-                       ((if (null next-cp)) (mv t nil state))
-                       (the-hint
-                         `(:clause-processor (,next-cp clause ',smt-hint
-                                                       state)))
-                       (hinted-goal `((hint-please ',the-hint) ,@cl)))
-                    (value (list hinted-goal))))
-        (prog2$ (cw "term-rewrite-cp: feeding new clause back into pipeline~%")
-                (b* ((next-cp (cdr (assoc-equal 'process-hint
-                                                *SMT-architecture*)))
-                     ((if (null next-cp)) (mv t nil state))
-                     (the-hint
-                       `(:clause-processor (,next-cp clause ',smt-hint state)))
-                     ;; New goals and side conditions
-                     (trans-theory (smtlink-hint->translation-theory smt-hint))
-                     (side-goals
-                       (tterms-exprs->side-goals tterms
-                                                 new-cl
-                                                 trans-theory))
-                     (hinted-new-goal `((hint-please ',the-hint) ,@new-cl)))
-                  (value (cons hinted-new-goal side-goals)))))))
+          (b* ((next-cp (cdr (assoc-equal 'term-rewrite
+                                          *SMT-architecture*)))
+               ((if (null next-cp)) (mv t nil state))
+               (the-hint
+                 `(:clause-processor (,next-cp clause ',smt-hint
+                                               state)))
+               (hinted-goal `((hint-please ',the-hint) ,@cl)))
+            (value (list hinted-goal)))
+        (b* ((next-cp (cdr (assoc-equal 'process-hint
+                                        *SMT-architecture*)))
+             ((if (null next-cp)) (mv t nil state))
+             (the-hint
+               `(:clause-processor (,next-cp clause ',smt-hint state)))
+             ;; New goals and side conditions
+             (trans-theory (smtlink-hint->translation-theory smt-hint))
+             (side-goals
+               (tterms-exprs->side-goals tterms
+                                         new-cl
+                                         trans-theory))
+             (hinted-new-goal `((hint-please ',the-hint) ,@new-cl)))
+          (value (cons hinted-new-goal side-goals))))))
 
 
   (defrule correctness-of-term-rewrite-cp
