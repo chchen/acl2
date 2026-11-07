@@ -108,8 +108,8 @@
   (define bad-equal (who x j-alist val)
     :returns (v acl2::any-p)
     (prog2$
-      (and (member 'my-equal (flatten val))
-	   (er hard? 'bad-equal "bad my-equal: (~x0 ~x1 ~x2) -> ~x3~%" who x j-alist val))
+      (and (member 'ti-equal (flatten val))
+	   (er hard? 'bad-equal "bad ti-equal: (~x0 ~x1 ~x2) -> ~x3~%" who x j-alist val))
       val)
     ///
     (more-returns (v :name bad-equal-is-identity (equal v val))))
@@ -343,7 +343,7 @@ with cond and (not cond) respectively."
 (defsection proto-judgements
   :short "add judgements to each subterm of a tterm"
   :long  "Add judgements to a tterm of the form
-    (my-equal (hide (cdr (cons expr-index (type-p x)))) (type-p x))
+    (ti-equal (hide (cdr (cons expr-index (type-p x)))) (type-p x))
 for each type-recognizer, type-p, known to smtlink.  We'll use rewrite$ to simplify
 the tterm-correct-expr generated from these judgements.  This allows us to connect
 the hidden (type-p x) with the unhidden, and thus rewritten (type-p x).  rewrite$
@@ -369,7 +369,7 @@ instance of a sub-expression."
 ;   adding these judgements should preserve tterm-correct-p.  I haven't included
 ;   a proof because we have to verify the result of rewrite$ at run-time anyway.
 
-  (define my-equal ((x acl2::any-p) (y acl2::any-p))
+  (define ti-equal ((x acl2::any-p) (y acl2::any-p))
     :returns (ok booleanp)
     (equal x y))
 
@@ -380,7 +380,7 @@ instance of a sub-expression."
     (b* (((if (endp recognizers)) nil)
 	 ((cons rec tl) (symbol-list-fix recognizers)))
        (set::insert
-	 `(my-equal (hide (cdr (cons ,(kwote expr-index) (,rec x))))
+	 `(ti-equal (hide (cdr (cons ,(kwote expr-index) (,rec x))))
 		    (bool-fix$inline (,rec x)))
 	  (proto-judge-help tl expr-index))))
 
@@ -445,12 +445,12 @@ instance of a sub-expression."
     ///
     (verify-guards proto-judgements-term))
 
-  ; The case-match in parse-my-equal below nicely (imho) expresses the pattern
-  ;   we want to handle for (my-equal ...) expressions returned by rewrite$.
+  ; The case-match in parse-ti-equal below nicely (imho) expresses the pattern
+  ;   we want to handle for (ti-equal ...) expressions returned by rewrite$.
   ;   It also causes prolific case splitting.  To manage this, we quarantine
-  ;   the case-match in parse-my-equal and process the results of the
-  ;   case-match in parese-my-equal-help.
-  (define parse-my-equal-help ((js nat-tterm-alist-p) (i natp) (j judge-p))
+  ;   the case-match in parse-ti-equal and process the results of the
+  ;   case-match in parese-ti-equal-help.
+  (define parse-ti-equal-help ((js nat-tterm-alist-p) (i natp) (j judge-p))
     :returns (new-js nat-tterm-alist-p)
     :verify-guards nil
     (b* ((js (nat-tterm-alist-fix js))
@@ -458,12 +458,12 @@ instance of a sub-expression."
 	 (j (judge-fix j))
 	 (a (hons-get i js))
 	 ((unless a)
-	  (er acl2::hard? 'parse-my-equal
+	  (er acl2::hard? 'parse-ti-equal
 	      "Smtlink internal error: bad expr-index, ~x0~%" i))
 	 ((tterm tt0) (cdr a))
 	 (tt1 (if (and (not (set::emptyp tt0.judgements))
 		       (consp (set::head tt0.judgements))
-		       (equal (car (set::head tt0.judgements)) 'my-equal))
+		       (equal (car (set::head tt0.judgements)) 'ti-equal))
 		(change-tterm tt0 :judgements nil)
 		tt0)))
       (hons-acons i (tterm-add-judge-set tt1 (list j)) js))
@@ -471,23 +471,23 @@ instance of a sub-expression."
     (local (defrule guard-lemma
       (implies (judge-p j) (judge-set-p (list j)))
       :enable judge-set-p))
-    (verify-guards parse-my-equal-help))
+    (verify-guards parse-ti-equal-help))
 
-  (define parse-my-equal ((js nat-tterm-alist-p) (x pseudo-termp))
+  (define parse-ti-equal ((js nat-tterm-alist-p) (x pseudo-termp))
     :returns (new-js nat-tterm-alist-p)
     :verify-guards nil
     (let ((js (nat-tterm-alist-fix js)))
       (case-match x
-	(('my-equal ('hide ('cdr ('cons ('quote expr-index) (type-recognizer &)))) ''t)
+	(('ti-equal ('hide ('cdr ('cons ('quote expr-index) (type-recognizer &)))) ''t)
 	 (if (and (natp expr-index) (symbolp type-recognizer))
-	   (parse-my-equal-help js expr-index `(,type-recognizer x))
+	   (parse-ti-equal-help js expr-index `(,type-recognizer x))
 	   js))
 	(& js)))
     ///
     (local (defrule guard-lemma
       (implies (symbolp type-recognizer) (judge-p `(,type-recognizer x)))
       :enable judge-p))
-    (verify-guards parse-my-equal))
+    (verify-guards parse-ti-equal))
 
 
   (define delete-empty-judgements ((js nat-tterm-alist-p) (keys nat-listp))
@@ -502,7 +502,7 @@ instance of a sub-expression."
 	 ((tterm tt) (cdr a))
 	 (js2 (if (and (consp tt.judgements)
 		       (consp (car tt.judgements))
-		       (equal (caar tt.judgements) 'my-equal))
+		       (equal (caar tt.judgements) 'ti-equal))
 		(hons-acons hd (change-tterm tt :judgements nil) js)
 		js)))
       (delete-empty-judgements js2 tl)))
@@ -513,8 +513,8 @@ instance of a sub-expression."
     (b* ((js (nat-tterm-alist-fix js))
 	 (x (pseudo-term-fix x))
 	 ((unless (equal (acl2::pseudo-term-kind x) :fncall)) js)
-	 ((if (equal (acl2::pseudo-term-fncall->fn x) 'my-equal))
-	  (parse-my-equal js x))
+	 ((if (equal (acl2::pseudo-term-fncall->fn x) 'ti-equal))
+	  (parse-ti-equal js x))
 	 ((unless (equal (acl2::pseudo-term-fncall->fn x) 'if)) js)
 	 (args (acl2::pseudo-term-fncall->args x))
 	 ((unless (and (consp args)
@@ -551,7 +551,7 @@ instance of a sub-expression."
   :long  "Emperically, applying rewrite$ to the  tterm-correct-expr of a term
 returns an if-then-else tree where the conditions are the path-conditions of
 the term.  If an if-condition, then-expression, or else-expression is an
-application of my-equal, we check to see if the unhidden version of the
+application of ti-equal, we check to see if the unhidden version of the
 type-recognizer call rewrote to 't.  If so, we add that type-judgement
 to the term."
 
@@ -564,7 +564,7 @@ to the term."
 	     'missing-judgements
 	     (set::head tt-proto.judgements)))
 	 (tt3 (case-match j1
-		(('my-equal ('hide ('cdr ('cons ('quote expr-index) &))) &)
+		(('ti-equal ('hide ('cdr ('cons ('quote expr-index) &))) &)
 		 (b* (((unless (natp expr-index))
 		       (er hard? 'merge-judgements-fetch
 			   "Smtlink, internal error: expr-index is not a natp -- ~x0"
@@ -580,7 +580,7 @@ to the term."
 		 (er hard? 'merge-judgements-fetch
 		     "Smtlink, internal error: tt-proto has no judgements"))
 		(& (er hard? 'merge-judgements-fetch
-		       "tt-proto judgements aren't my-equal tests"))))
+		       "tt-proto judgements aren't ti-equal tests"))))
 	 )
 	(if tt3 tt3 tt-proto)))
 
