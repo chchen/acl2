@@ -63,6 +63,13 @@
         (cons 'rational-/ 'acl2::|/|)
         (cons 'int-to-rat 'acl2::|to_real|)))
 
+;; Partial support, no exponents, division, or modulus
+(defconst *SMT-Ints*
+  (list (cons 'integer-- 'acl2::|-|)
+        (cons 'integer-+ 'acl2::|+|)
+        (cons 'integer-* 'acl2::|*|)
+        (cons 'integer-< 'acl2::|<|)))
+
 ;; Arrays
 (defconst *SMT-ArraysEx*
   (list (cons 'int-sym-array-select 'acl2::|select|)
@@ -76,6 +83,7 @@
 
 (defconst *SMT-AUFNIRA*
   (append *SMT-Core*
+          *SMT-Ints*
           *SMT-Reals*
           *SMT-ArraysEx*))
 

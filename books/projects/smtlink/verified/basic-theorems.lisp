@@ -81,6 +81,62 @@
              (equal (unary-/ x)
                     (rational-/ x)))))
 
+(encapsulate
+    (((integer-+ * *) => *)
+     ((integer-- *) => *)
+     ((integer-* * *) => *)
+     ((integer-< * *) => *))
+
+  (local
+    (defun integer-+ (x y)
+      (binary-+ x y)))
+
+  (local
+    (defun integer-- (x)
+      (unary-- x)))
+
+  (local
+    (defun integer-* (x y)
+      (binary-* x y)))
+
+  (local
+    (defun integer-< (x y)
+      (< x y)))
+
+  (defthm return-of-integer-+
+    (implies (and (integerp x)
+                  (integerp y))
+             (integerp (integer-+ x y))))
+
+  (defthm return-of-integer--
+    (implies (integerp x)
+             (integerp (integer-- x))))
+
+  (defthm return-of-integer-*
+    (implies (and (integerp x)
+                  (integerp y))
+             (integerp (integer-* x y))))
+
+  (defthm return-of-integer-<
+    (implies (and (integerp x)
+                  (integerp y))
+             (booleanp (integer-< x y))))
+
+  (defthmd specialize-binary-integer-operators
+    (implies (and (integerp x)
+                  (integerp y))
+             (and (equal (binary-+ x y)
+                         (integer-+ x y))
+                  (equal (binary-* x y)
+                         (integer-* x y))
+                  (equal (< x y)
+                         (integer-< x y)))))
+
+  (defthmd specialize-unary-integer-
+    (implies (integerp x)
+             (equal (unary-- x)
+                    (integer-- x)))))
+
 ;; --------------------------------------
 ;; Returns theorems
 

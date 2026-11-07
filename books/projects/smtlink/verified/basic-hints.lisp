@@ -248,6 +248,26 @@
                            :returns (list (make-thm-spec
                                             :formals '(x y)
                                             :thm 'return-of-rational-<)))
+        (make-smt-function :name 'integer-+
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x y)
+                                            :thm 'return-of-integer-+)))
+        (make-smt-function :name 'integer--
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x)
+                                            :thm 'return-of-integer--)))
+        (make-smt-function :name 'integer-*
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x y)
+                                            :thm 'return-of-integer-*)))
+        (make-smt-function :name 'integer-<
+                           :kind :basic
+                           :returns (list (make-thm-spec
+                                            :formals '(x y)
+                                            :thm 'return-of-integer-<)))
         (make-smt-function :name 'if
                            :kind :basic
                            :translation-hint
